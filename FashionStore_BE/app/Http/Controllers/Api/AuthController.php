@@ -16,7 +16,7 @@ class AuthController extends Controller
     {
         $data = $request->validate([
             'name'                  => ['required', 'string', 'max:100'],
-            'email'                 => ['required', 'email', 'max:255', Rule::unique('uttt_user', 'email')],
+            'email'                 => ['required', 'email', 'max:255', Rule::unique('nqtv_user', 'email')],
             'password'              => ['required', 'string', 'min:6', 'confirmed'],
             'phone'                 => ['required', 'string', 'max:20'],
             'address'               => ['nullable', 'string', 'max:1000'],
@@ -87,12 +87,12 @@ class AuthController extends Controller
         ], 200);
     }
 
-// ================= Đăng xuất =================
-public function logout(Request $request)
-{
-    $request->user()->tokens()->delete(); // xoá tất cả token user
-    return response()->json(['message' => 'Đăng xuất thành công']);
-}
+    // ================= Đăng xuất =================
+    public function logout(Request $request)
+    {
+        $request->user()->tokens()->delete(); // xoá tất cả token user
+        return response()->json(['message' => 'Đăng xuất thành công']);
+    }
 
     // ================= Helper =================
     private function makeBaseUsername(string $name, string $email): string

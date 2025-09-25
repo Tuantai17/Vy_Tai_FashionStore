@@ -6,10 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class OrderDetail extends Model
 {
-    // Tên bảng trong DB
-    protected $table = 'nqtv_orderdetail';
+    protected $table = 'nqtv_orderdetail'; // đúng theo DB của bạn
 
-    // Các cột cho phép gán dữ liệu
+    // Nếu bảng có cột id tự tăng: có thể bỏ 2 dòng dưới.
+    // Nếu KHÔNG dùng 'id' (ví dụ không có PK, hoặc PK khác),
+    // hãy khai báo cho đúng, vd:
+    // protected $primaryKey = 'id';    // sửa nếu khác
+    // public $incrementing = true;     // hoặc false nếu không tự tăng
+    // protected $keyType = 'int';
+
     protected $fillable = [
         'order_id',
         'product_id',
@@ -18,6 +23,23 @@ class OrderDetail extends Model
         'amount',
     ];
 
-    // ❌ Bảng này không có created_at, updated_at
     public $timestamps = false;
+
+    // Quan hệ tiện dụng
+    public function order()
+    {
+        return $this->belongsTo(Order::class, 'order_id');
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class, 'product_id');
+    }
+
+    // (không bắt buộc) ép kiểu số để withSum/tính toán ổn định
+    protected $casts = [
+        'price_buy' => 'float',
+        'qty'       => 'int',
+        'amount'    => 'float',
+    ];
 }

@@ -50,26 +50,31 @@
 
 
 
-namespace App\Http\Controllers\Api;
+
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use App\Models\Product;
 
 class ProductController extends Controller
 {
-    // Danh sách sản phẩm (có phân trang)
+    // ====================== PUBLIC LIST ======================
     public function index()
     {
         $products = Product::with('brand:id,name')
-            ->select(['id','name','brand_id','price_sale as price','thumbnail'])
+            ->select(['id', 'name', 'brand_id', 'price_sale as price', 'thumbnail'])
             ->latest('id')
-            ->paginate(12); // ✅ mỗi trang 12 sp (có thể chỉnh)
+            ->paginate(12);
 
-        return $products->makeHidden(['brand','brand_id']);
+        // Ẩn brand_id nếu không muốn lộ schema nội bộ
+        return $products->makeHidden(['brand', 'brand_id']);
     }
 
-    // Chi tiết sản phẩm
     public function show($id)
     {
         $p = Product::with('brand:id,name')
@@ -85,41 +90,171 @@ class ProductController extends Controller
             ])
             ->find($id);
 
-        if (!$p) return response()->json(['message' => 'Not found'], 404);
+        if (!$p) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
 
-        return $p->makeHidden(['brand','brand_id']);
+        return $p->makeHidden(['brand', 'brand_id']);
     }
 
-    // Sản phẩm theo danh mục (có phân trang)
     public function byCategory($id)
     {
         $items = Product::with('brand:id,name')
             ->where('category_id', $id)
-            ->select(['id','name','brand_id','price_sale as price','thumbnail'])
+            ->select(['id', 'name', 'brand_id', 'price_sale as price', 'thumbnail'])
             ->latest('id')
-            ->paginate(12); // ✅ phân trang 12 sp
+            ->paginate(12);
 
-        return $items->makeHidden(['brand','brand_id']);
+        return $items->makeHidden(['brand', 'brand_id']);
     }
 
-    // Admin - danh sách sản phẩm (có phân trang)
+    // ====================== ADMIN LIST ======================
     public function adminIndex()
     {
         $products = Product::with('brand:id,name')
-            ->select([
-                'id',
-                'name',
-                'slug',
-                'brand_id',
-                'price_root',
-                'price_sale',
-                'qty',
-                'thumbnail'
-            ])
+            ->select(['id', 'name', 'slug', 'brand_id', 'price_root', 'price_sale', 'qty', 'thumbnail', 'status'])
             ->latest('id')
-            ->paginate(5); // ✅ mỗi trang 20 sp cho admin
+            ->paginate(10);
 
-        return $products->makeHidden(['brand','brand_id']);
+        return $products->makeHidden(['brand', 'brand_id']);
+    }
+
+    // ====================== CREATE ======================
+    public function store(Request $req)
+    {
+        // Hỗ trợ gửi JSON hoặc FormData (multipart)
+        $data = $req->validate([
+            'name'        => 'required|string|max:255',
+            'slug'        => 'nullable|string|max:255|unique:nqtv_product,slug',
+            'price_root'  => 'nullable|numeric|min:0',
+            'price_sale'  => 'nullable|numeric|min:0',
+            'qty'         => 'nullable|integer|min:0',
+            'category_id' => 'nullable|integer|exists:nqtv_category,id',
+            'brand_id'    => 'required|integer|exists:nqtv_brand,id',
+            'status'      => 'nullable|in:0,1',
+            'description' => 'nullable|string',
+            'detail'      => 'nullable|string',
+            'thumbnail'   => 'nullable|image|max:4096',  // nếu gửi FormData
+        ]);
+
+        // Tự sinh slug nếu không truyền
+        $data['slug'] = $data['slug'] ?? Str::slug($data['name']);
+
+        // Upload ảnh nếu có (FormData)
+        $thumbPath = null;
+        if ($req->hasFile('thumbnail')) {
+            $thumbPath = $req->file('thumbnail')->store('products', 'public'); // storage/app/public/products
+        }
+
+        // Giá trị mặc định an toàn
+        $payload = [
+            'name'        => $data['name'],
+            'slug'        => $data['slug'],
+            'price_root'  => $data['price_root']  ?? 0,
+            'price_sale'  => $data['price_sale']  ?? 0,
+            'qty'         => $data['qty']         ?? 0,
+            'category_id' => $data['category_id'] ?? null,
+            'brand_id'    => $data['brand_id'],
+            'status'      => $data['status']      ?? 1,
+            'thumbnail'   => $thumbPath,
+            'description' => $data['description'] ?? null,
+            'detail'      => $data['detail']      ?? null,
+        ];
+
+        // Nếu DB có cột created_by/updated_by KHÔNG default -> gán vào (không lỗi nếu DB không có cột)
+        $userId = Auth::id() ?? 1; // tuỳ hệ thống auth của bạn
+        if (schema_has_column('nqtv_product', 'created_by')) $payload['created_by'] = $userId;
+        if (schema_has_column('nqtv_product', 'updated_by')) $payload['updated_by'] = $userId;
+
+        $product = Product::create($payload);
+
+        return response()->json([
+            'message' => 'Tạo sản phẩm thành công',
+            'data'    => $product,
+        ], 201);
+    }
+
+    // ====================== UPDATE ======================
+    public function update(Request $request, $id)
+    {
+        $p = Product::find($id);
+        if (!$p) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        $validated = $request->validate([
+            'name'        => 'required|string|max:255',
+            'slug'        => 'nullable|string|max:255',
+            'price_root'  => 'nullable|numeric|min:0',
+            'price_sale'  => 'nullable|numeric|min:0',
+            'qty'         => 'nullable|integer|min:0',
+            'category_id' => 'nullable|exists:nqtv_category,id',
+            'brand_id'    => 'required|exists:nqtv_brand,id',
+            'description' => 'nullable|string',
+            'status'      => 'nullable|in:0,1',
+            'thumbnail'   => 'nullable|image|max:4096',
+        ]);
+
+        // Cập nhật các trường
+        $p->fill([
+            'name'        => $validated['name'],
+            'slug'        => $validated['slug'] ?? Str::slug($validated['name']),
+            'price_root'  => $validated['price_root'] ?? 0,
+            'price_sale'  => $validated['price_sale'] ?? 0,
+            'qty'         => $validated['qty'] ?? 0,
+            'category_id' => $validated['category_id'] ?? null,
+            'brand_id'    => $validated['brand_id'],
+            'description' => $validated['description'] ?? null,
+            'status'      => $validated['status'] ?? 1,
+            'updated_by'  => auth()->id(),
+        ]);
+
+        // Nếu upload ảnh mới
+        if ($request->hasFile('thumbnail')) {
+            if ($p->thumbnail && Storage::disk('public')->exists($p->thumbnail)) {
+                Storage::disk('public')->delete($p->thumbnail);
+            }
+            $path = $request->file('thumbnail')->store('products', 'public');
+            $p->thumbnail = $path;
+        }
+
+        $p->save();
+
+        return response()->json([
+            'message' => 'updated',
+            'data'    => $p->load('brand')->append(['thumbnail_url', 'brand_name']),
+        ]);
+    }
+
+    // ====================== DELETE ======================
+    public function destroy($id)
+    {
+        $p = Product::find($id);
+        if (!$p) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        // Nếu bạn muốn xoá file ảnh khỏi storage
+        if ($p->thumbnail && Storage::disk('public')->exists($p->thumbnail)) {
+            Storage::disk('public')->delete($p->thumbnail);
+        }
+
+        $p->delete(); // hard delete; nếu muốn soft delete, dùng trait SoftDeletes
+        return response()->json(['message' => 'Deleted']);
     }
 }
 
+/**
+ * Helper nhỏ: kiểm tra tồn tại cột để gán created_by/updated_by an toàn.
+ * Có thể chuyển hàm này vào một helper chung nếu bạn muốn.
+ */
+if (!function_exists('schema_has_column')) {
+    function schema_has_column(string $table, string $column): bool
+    {
+        try {
+            return \Illuminate\Support\Facades\Schema::hasColumn($table, $column);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+}

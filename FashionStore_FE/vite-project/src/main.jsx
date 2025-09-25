@@ -18,6 +18,10 @@ import Checkout from "./pages/Customers/Checkout";
 import AdminLayout from "./layouts/AdminLayout";
 import Dashboard from "./pages/Admin/Dashboard";
 import AdminProducts from "./pages/Admin/Product/Products";
+
+import ProductAdd from "./pages/Admin/Product/AddProduct";   // ✅ thêm
+import EditProduct from "./pages/Admin/Product/EditProduct"; // ✅ sửa
+
 import AdminCategories from "./pages/Admin/Category/Categories";
 import AdminOrders from "./pages/Admin/Order/Orders";
 import AdminUsers from "./pages/Admin/User/Users";
@@ -141,6 +145,10 @@ function App() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="products" element={<AdminProducts />} />
+<Route path="products/new" element={<ProductAdd />} />  {/* ✅ thêm */}
+  <Route path="products/:id/edit" element={<EditProduct />} /> {/* ✅ */}
+     
+     
           <Route path="categories" element={<AdminCategories />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="users" element={<AdminUsers />} />
