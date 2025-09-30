@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\UserController;
 
 
 use App\Http\Controllers\Api\BrandController;
@@ -62,4 +63,16 @@ Route::prefix('admin')->group(function () {
     Route::post('/products', [ProductController::class, 'store']);
     Route::put('/products/{id}', [ProductController::class, 'update']);   // ✅ cần có
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+});
+
+
+// ===== Users (Admin quản lý user) =====
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/users', [UserController::class, 'index']);
+    Route::get('/users/{id}', [UserController::class, 'show']);
+    Route::post('/users', [UserController::class, 'store']);
+    Route::put('/users/{id}', [UserController::class, 'update']);
+    Route::delete('/users/{id}', [UserController::class, 'destroy']);
+    Route::post('/users/{id}/lock', [UserController::class, 'lock']);
+    Route::post('/users/{id}/unlock', [UserController::class, 'unlock']);
 });

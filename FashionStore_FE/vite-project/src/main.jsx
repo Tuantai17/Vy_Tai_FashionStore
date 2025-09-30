@@ -17,6 +17,7 @@ import CategoryProducts from "./pages/Customers/CategoryProducts";
 import Register from "./pages/Customers/Register";
 import Login from "./pages/Customers/Login";
 import Checkout from "./pages/Customers/Checkout";
+import Contact from "./pages/Customers/Contact";
 
 // ===== Admin pages/layout =====
 import AdminLayout from "./layouts/AdminLayout";
@@ -70,6 +71,7 @@ function Layout({ children }) {
           <NavLink to="/" end>Trang chủ</NavLink>
           <NavLink to="/products">Sản phẩm</NavLink>
           <NavLink to="/cart">Giỏ hàng</NavLink>
+          <NavLink to="/contact">Liên hệ</NavLink>
 
           {user ? (
             <>
@@ -93,8 +95,10 @@ function Layout({ children }) {
             </>
           ) : (
             <>
+              <NavLink to="/contact">Liên hệ</NavLink>
               <NavLink to="/register">Đăng ký</NavLink>
               <NavLink to="/login">Đăng nhập</NavLink>
+
             </>
           )}
         </nav>
@@ -147,6 +151,7 @@ function App() {
         <Route path="/cart" element={<Layout><Cart cart={cart} setCart={setCart} /></Layout>} />
         <Route path="/register" element={<Layout><Register /></Layout>} />
         <Route path="/login" element={<Layout><Login /></Layout>} />
+        <Route path="/contact" element={<Layout><Contact /></Layout>} />
 
         {/* ====== Admin login riêng ====== */}
         <Route path="/admin/login" element={<LoginAdmin />} />

@@ -241,15 +241,12 @@ class ProductController extends Controller
             Storage::disk('public')->delete($p->thumbnail);
         }
 
-        $p->delete(); // hard delete; nếu muốn soft delete, dùng trait SoftDeletes
+        $p->delete(); 
         return response()->json(['message' => 'Deleted']);
     }
 }
 
-/**
- * Helper nhỏ: kiểm tra tồn tại cột để gán created_by/updated_by an toàn.
- * Có thể chuyển hàm này vào một helper chung nếu bạn muốn.
- */
+
 if (!function_exists('schema_has_column')) {
     function schema_has_column(string $table, string $column): bool
     {

@@ -373,51 +373,6 @@ export default function Home() {
                       </div>
                     ))}
                 </div>
-
-                {/* Con */}
-                <h3 style={{ fontSize: 22, fontWeight: 600, margin: "20px 0", color: "#9c27b0" }}>
-                  Danh mục phụ
-                </h3>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 24,
-                    justifyContent: "center",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  {categories
-                    .filter((c) => c.parent_id)
-                    .map((c) => (
-                      <div
-                        key={c.id}
-                        onClick={() => navigate(`/category/${c.id}`)}
-                        style={{
-                          cursor: "pointer",
-                          borderRadius: 12,
-                          overflow: "hidden",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                          background: "#fff",
-                          transition: "transform 0.2s ease",
-                          minWidth: 160,
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                      >
-                        <img
-                          src={pickImage(c)}
-                          alt={c.name}
-                          style={{ width: "100%", height: 120, objectFit: "cover" }}
-                          onError={(e) => (e.currentTarget.src = PLACEHOLDER)}
-                        />
-                        <div style={{ padding: "8px", textAlign: "center" }}>
-                          <span style={{ fontWeight: 500, fontSize: 14, color: "#555" }}>
-                            {c.name}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
               </>
             )}
           </section>
