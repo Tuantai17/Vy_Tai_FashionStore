@@ -206,7 +206,9 @@ class ProductController extends Controller
             'brand_id'    => $validated['brand_id'],
             'description' => $validated['description'] ?? null,
             'status'      => $validated['status'] ?? 1,
-            'updated_by'  => auth()->id(),
+            'updated_by'  => \Illuminate\Support\Facades\Auth::id(),
+            // 'updated_by'  => auth()->id(),
+
         ]);
 
         // Nếu upload ảnh mới

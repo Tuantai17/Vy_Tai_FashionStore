@@ -23,9 +23,13 @@ Route::get('/products',       [ProductController::class, 'index']);
 Route::get('/products/{id}',  [ProductController::class, 'show']);
 
 // ===== Categories =====
-Route::get('/categories',               [CategoryController::class, 'index']);
-Route::get('/categories/{id}',          [CategoryController::class, 'show']);
-Route::get('/categories/{id}/products', [ProductController::class, 'byCategory']);
+Route::prefix('categories')->group(function () {
+    Route::get('/',        [CategoryController::class, 'index']);  // ?q=...&page=...
+    Route::get('{id}',     [CategoryController::class, 'show']);
+    Route::post('/',       [CategoryController::class, 'store']);  // JSON hoặc multipart
+    Route::put('{id}',     [CategoryController::class, 'update']);
+    Route::delete('{id}',  [CategoryController::class, 'destroy']);
+});
 
 // ===== Brands =====
 Route::get('/brands', [BrandController::class, 'index']);

@@ -1,23 +1,22 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";   // thêm
 
-const API_BASE = "http://127.0.0.1:8000"; // Laravel API
+const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 export default function Categories() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const navigate = useNavigate(); // thêm
 
   useEffect(() => {
     const ac = new AbortController();
-
     (async () => {
       try {
         setLoading(true);
         setErr("");
-
-        const res = await fetch(`${API_BASE}/categories`, { signal: ac.signal });
+        const res = await fetch(`${API_BASE}/api/categories`, { signal: ac.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
         const data = await res.json();
         const list = Array.isArray(data) ? data : data.data ?? [];
         setRows(list);
@@ -27,16 +26,16 @@ export default function Categories() {
         setLoading(false);
       }
     })();
-
     return () => ac.abort();
   }, []);
 
   return (
     <section style={{ padding: 20 }}>
+      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{ fontSize: 24 }}>Quản lý danh mục</h1>
         <button
-          onClick={() => alert("TODO: tạo danh mục")}
+          onClick={() => navigate("/admin/category/add")}   // đổi sang điều hướng
           style={{
             padding: "8px 12px",
             borderRadius: 8,

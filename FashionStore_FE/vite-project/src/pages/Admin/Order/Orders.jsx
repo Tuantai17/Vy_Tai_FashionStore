@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-const API_BASE = "http://127.0.0.1:8000/api"; // giữ giống các trang khác
+const API_BASE = "http://127.0.0.1:8000/api";
 const VND = new Intl.NumberFormat("vi-VN");
 
 const badgeStyle = (status) => {
@@ -15,7 +16,6 @@ const badgeStyle = (status) => {
   };
 };
 
-// map số -> chữ
 const humanStatus = (s) => {
   if (typeof s === "string") return s;
   switch (Number(s)) {
@@ -27,6 +27,7 @@ const humanStatus = (s) => {
 };
 
 export default function Orders() {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -59,7 +60,6 @@ export default function Orders() {
     <section>
       <h1 style={{ fontSize: 24, marginBottom: 12 }}>Orders</h1>
 
-      {/* Tìm kiếm nhanh */}
       <div style={{ margin: "8px 0 12px", display: "flex", gap: 8 }}>
         <input
           value={search}
@@ -101,7 +101,7 @@ export default function Orders() {
                 <td align="right">₫{VND.format(Number(o.total ?? 0))}</td>
                 <td><span style={badgeStyle(o.status)}>{humanStatus(o.status)}</span></td>
                 <td align="center">
-                  <button onClick={() => alert("View " + o.id)}>Xem</button>
+                  <button onClick={() => navigate(`/admin/orders/${o.id}`)}>Xem</button>
                 </td>
               </tr>
             ))}

@@ -57,34 +57,34 @@ class OrderController extends Controller
         ]);
     }
 
-public function index(Request $request)
-{
-    // optional filters
-    $status   = $request->integer('status', null);
-    $search   = $request->string('search')->toString();
-    $perPage  = max(1, min(100, (int) $request->get('per_page', 20)));
+    public function index(Request $request)
+    {
+        // optional filters
+        $status   = $request->integer('status', null);
+        $search   = $request->string('search')->toString();
+        $perPage  = max(1, min(100, (int) $request->get('per_page', 20)));
 
-    $q = Order::query()
-        ->withCount('details')                   // details_count
-        ->withSum('details as total', 'amount'); // tổng tiền từ order_details.amount
+        $q = Order::query()
+            ->withCount('details')                   // details_count
+            ->withSum('details as total', 'amount'); // tổng tiền từ order_details.amount
 
-    if (!is_null($status)) {
-        $q->where('status', $status);
+        if (!is_null($status)) {
+            $q->where('status', $status);
+        }
+
+        if ($search) {
+            $q->where(function ($qq) use ($search) {
+                $qq->where('name', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('id', $search);
+            });
+        }
+
+        $orders = $q->latest('id')->paginate($perPage);
+
+        return response()->json($orders);
     }
-
-    if ($search) {
-        $q->where(function ($qq) use ($search) {
-            $qq->where('name', 'like', "%{$search}%")
-               ->orWhere('phone', 'like', "%{$search}%")
-               ->orWhere('email', 'like', "%{$search}%")
-               ->orWhere('id', $search);
-        });
-    }
-
-    $orders = $q->latest('id')->paginate($perPage);
-
-    return response()->json($orders);
-}
 
     public function show(Order $order)
     {
@@ -94,8 +94,4 @@ public function index(Request $request)
 
         return response()->json($order);
     }
-
-
 }
-
-
