@@ -88,10 +88,33 @@ class OrderController extends Controller
 
     public function show(Order $order)
     {
-        // trả về 1 đơn + chi tiết
-        $order->load(['details' /*, 'details.product' nếu có quan hệ product */])
+        $order->load(['details.product:id,thumbnail,name'])
             ->loadSum('details as total', 'amount');
 
-        return response()->json($order);
+        return response()->json([
+            'id'         => $order->id,
+            'name'       => $order->name,
+            'email'      => $order->email,
+            'phone'      => $order->phone,
+            'address'    => $order->address,
+            'note'       => $order->note,
+            'status'     => (int)($order->status ?? 0),
+            'total'      => (float)$order->total,  // alias từ loadSum
+            'created_at' => $order->created_at,
+            'updated_at' => $order->updated_at,
+            'items'      => $order->details->map(function ($d) {
+                $p = $d->product;                          // có thể null nếu bị xóa
+                $img = $p?->thumbnail_url ?? $p?->thumbnail;
+                return [
+                    'id'            => $d->id,
+                    'product_id'    => $d->product_id,
+                    'product_name'  => $p?->name ?? 'Sản phẩm',
+                    'product_image' => $img,               // ẢNH (không tạo cột)
+                    'price'         => (float)$d->price_buy,
+                    'qty'           => (int)$d->qty,
+                    'subtotal'      => (float)($d->amount ?? $d->price_buy * $d->qty),
+                ];
+            })->values(),
+        ]);
     }
 }

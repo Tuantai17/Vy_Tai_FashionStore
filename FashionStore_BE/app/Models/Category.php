@@ -4,69 +4,67 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+// use Illuminate\Database\Eloquent\SoftDeletes; // nếu muốn xoá mềm thì bật
 
 class Category extends Model
 {
     use HasFactory;
+    // use SoftDeletes;
 
-    protected $table = 'nqtv_category'; // ✅ trỏ đúng bảng trong DB
+    protected $table = 'nqtv_category';
 
-    protected $fillable = ['name', 'slug', 'image', 'parent_id', 'sort_order', 'description'];
+    protected $fillable = [
+        'name',
+        'slug',
+        'image',        // chỉ lưu tên file (vd: ao.jpg) hoặc đường dẫn tuỳ bạn
+        'parent_id',
+        'sort_order',
+        'description',
+        'created_by',
+        'updated_by',
+        'status',       // 0/1
+    ];
 
+    protected $casts = [
+        'parent_id'  => 'integer',
+        'sort_order' => 'integer',
+        'status'     => 'integer', // hoặc 'boolean' nếu bạn muốn true/false
+    ];
+
+    // FE nhận thêm field image_url luôn
+    protected $appends = ['image_url'];
+
+    public function getImageUrlAttribute(): ?string
+    {
+        if (!$this->image) return null;
+
+        // Nếu DB đã lưu URL tuyệt đối thì trả nguyên
+        if (str_starts_with($this->image, 'http://')
+            || str_starts_with($this->image, 'https://')
+            || str_starts_with($this->image, '/')) {
+            return $this->image;
+        }
+
+        // Bạn đang để ảnh trong public/assets/images
+        return url('assets/images/' . ltrim($this->image, '/'));
+
+        // Nếu sau này chuyển sang storage:
+        // return asset('storage/' . ltrim($this->image, '/'));
+    }
+
+    // Quan hệ sản phẩm (giữ nguyên)
     public function products()
     {
         return $this->hasMany(Product::class, 'category_id');
     }
+
+    // Tuỳ chọn: nếu cần dùng cây danh mục:
+    public function parent()
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+    public function children()
+    {
+        return $this->hasMany(self::class, 'parent_id');
+    }
 }
-
-
-
-// namespace App\Models;
-
-// use Illuminate\Database\Eloquent\Factories\HasFactory;
-// use Illuminate\Database\Eloquent\Model;
-// use Illuminate\Database\Eloquent\SoftDeletes;
-
-// class Category extends Model
-// {
-//     use HasFactory, SoftDeletes;
-
-//     // Tên bảng đúng trong database
-//     protected $table = 'nqtv_category';
-
-//     // Cho phép gán hàng loạt các trường này
-//     protected $fillable = [
-//         'name',
-//         'slug',
-//         'image',
-//         'parent_id',
-//         'sort_order',
-//         'description',
-//         'created_by',
-//         'updated_by',
-//         'status'
-//     ];
-
-//     // Ép kiểu dữ liệu khi lấy ra
-//     protected $casts = [
-//         'status'     => 'boolean',
-//         'parent_id'  => 'integer',
-//         'sort_order' => 'integer',
-//     ];
-
-//     /**
-//      * Quan hệ: Danh mục cha
-//      */
-//     public function parent()
-//     {
-//         return $this->belongsTo(self::class, 'parent_id');
-//     }
-
-//     /**
-//      * Quan hệ: Danh mục có nhiều sản phẩm
-//      */
-//     public function products()
-//     {
-//         return $this->hasMany(Product::class, 'category_id');
-//     }
-// }

@@ -91,23 +91,46 @@ export default function OrderDetail() {
             <tr style={{ background: "#fafafa" }}>
               <th>#</th>
               <th align="left">Sản phẩm</th>
+              <th align="center">Ảnh</th> {/* ⬅️ thêm */}
               <th align="right">Giá</th>
               <th align="right">SL</th>
               <th align="right">Tạm tính</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((it, idx) => (
-              <tr key={it.id || idx} style={{ borderTop: "1px solid #eee" }}>
-                <td>{idx + 1}</td>
-                <td>{it.product_name || it.name}</td>
-                <td align="right">₫{VND.format(Number(it.price))}</td>
-                <td align="right">{it.qty}</td>
-                <td align="right">₫{VND.format(Number(it.subtotal))}</td>
-              </tr>
-            ))}
+            {items.map((it, idx) => {
+              const price = Number(it.price ?? 0);
+              const qty = Number(it.qty ?? 0);
+              const subtotal = Number(it.subtotal ?? price * qty);
+              const name = it.product_name || it.name || "Sản phẩm";
+              const img = it.product_image; // BE trả từ join products
+
+              return (
+                <tr key={it.id || `${idx}-${name}`} style={{ borderTop: "1px solid #eee" }}>
+                  <td>{idx + 1}</td>
+                  <td>{name}</td>
+                  <td align="center">
+                    {img ? (
+                      <img
+                        src={img}
+                        alt={name}
+                        style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: "1px solid #eee" }}
+                        onError={(e) => (e.currentTarget.src = "https://placehold.co/56x56")}
+                      />
+                    ) : (
+                      <span style={{ color: "#999" }}>—</span>
+                    )}
+                  </td>
+                  <td align="right">₫{VND.format(price)}</td>
+                  <td align="right">{qty}</td>
+                  <td align="right">₫{VND.format(subtotal)}</td>
+                </tr>
+              );
+            })}
             {items.length === 0 && (
-              <tr><td colSpan={5} align="center" style={{ color: "#666" }}>Không có sản phẩm.</td></tr>
+              <tr>
+                <td colSpan={6} align="center" style={{ color: "#666" }}>Không có sản phẩm.</td>
+              </tr>
             )}
           </tbody>
           <tfoot>

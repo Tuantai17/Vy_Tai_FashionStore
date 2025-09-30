@@ -31,12 +31,12 @@ class AuthController extends Controller
         $user = User::create([
             'name'       => $data['name'],
             'email'      => $data['email'],
-            'password'   => $data['password'], // Model User đã cast hashed
+            'password'   => $data['password'], // User model đã có cast hashed
             'phone'      => $data['phone'],
             'username'   => $username,
             'address'    => $data['address'] ?? '',
             'avatar'     => $data['avatar'] ?? '',
-            'roles'      => 'customer',
+            'roles'      => 'customer', // mặc định customer
             'created_by' => 0,
             'status'     => 1,
         ]);
@@ -69,6 +69,11 @@ class AuthController extends Controller
 
         $user = Auth::user();
 
+        // Check tài khoản bị khóa
+        if ($user->status != 1) {
+            return response()->json(['message' => 'Tài khoản đã bị khóa'], 403);
+        }
+
         // Tạo token (Laravel Sanctum)
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -81,7 +86,7 @@ class AuthController extends Controller
                 'email'    => $user->email,
                 'phone'    => $user->phone,
                 'username' => $user->username,
-                'roles'    => $user->roles,
+                'roles'    => $user->roles, // admin / customer
                 'status'   => $user->status,
             ],
         ], 200);
@@ -90,7 +95,7 @@ class AuthController extends Controller
     // ================= Đăng xuất =================
     public function logout(Request $request)
     {
-        $request->user()->tokens()->delete(); // xoá tất cả token user
+        $request->user()->tokens()->delete(); // Xoá tất cả token user
         return response()->json(['message' => 'Đăng xuất thành công']);
     }
 

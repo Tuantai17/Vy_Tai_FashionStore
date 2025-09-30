@@ -1,51 +1,65 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";   // thêm
+import { useNavigate } from "react-router-dom";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const API_BASE = "http://127.0.0.1:8000/api";
 
 export default function Categories() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const navigate = useNavigate(); // thêm
+  const navigate = useNavigate();
+
+  const fetchCats = async () => {
+    try {
+      setLoading(true);
+      setErr("");
+
+      const res = await fetch(`${API_BASE}/categories`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : data.data ?? [];
+      setRows(list);
+    } catch (e) {
+      if (e.name !== "AbortError") setErr("Không tải được danh mục.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Xóa thẳng, không confirm
+  const deleteCat = async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/categories/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Xóa thất bại");
+      // Cập nhật state ngay, khỏi fetch lại toàn bộ
+      setRows((prev) => prev.filter((c) => c.id !== id));
+    } catch (e) {
+      alert(e.message);
+    }
+  };
 
   useEffect(() => {
-    const ac = new AbortController();
-    (async () => {
-      try {
-        setLoading(true);
-        setErr("");
-        const res = await fetch(`${API_BASE}/api/categories`, { signal: ac.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : data.data ?? [];
-        setRows(list);
-      } catch (e) {
-        if (e.name !== "AbortError") setErr("Không tải được danh mục.");
-      } finally {
-        setLoading(false);
-      }
-    })();
-    return () => ac.abort();
+    fetchCats();
   }, []);
 
   return (
     <section style={{ padding: 20 }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <h1 style={{ fontSize: 24 }}>Quản lý danh mục</h1>
         <button
-          onClick={() => navigate("/admin/category/add")}   // đổi sang điều hướng
-          style={{
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: "1px solid #0f62fe",
-            background: "#0f62fe",
-            color: "#fff",
-            cursor: "pointer",
-          }}
+          onClick={() => navigate("/admin/categories/add")}
+          className="mb-4 px-4 py-2 bg-blue-600 text-white rounded"
         >
-          + Add
+          + Thêm danh mục
         </button>
       </div>
 
@@ -76,21 +90,27 @@ export default function Categories() {
                   <td>{c.name}</td>
                   <td>{c.slug}</td>
                   <td align="center">
-                    <img
-                      src={c.image_url || `${API_BASE}/storage/${c.image}`}
-                      alt={c.name}
-                      style={{
-                        width: 60,
-                        height: 40,
-                        objectFit: "cover",
-                        borderRadius: 4,
-                      }}
-                    />
+                    {c.image ? (
+                      <img
+                        src={c.image_url || `${API_BASE}/storage/${c.image}`}
+                        alt={c.name}
+                        style={{
+                          width: 60,
+height: 40,
+                          objectFit: "cover",
+                          borderRadius: 4,
+                        }}
+                      />
+                    ) : (
+                      "-"
+                    )}
                   </td>
                   <td>{c.description}</td>
                   <td align="center">
                     <button
-                      onClick={() => alert("Edit " + c.id)}
+                      onClick={() =>
+                        navigate(`/admin/categories/edit/${c.id}`)
+                      }
                       style={{
                         padding: "4px 10px",
                         marginRight: 4,
@@ -104,7 +124,7 @@ export default function Categories() {
                       Sửa
                     </button>
                     <button
-                      onClick={() => setRows(rows.filter((x) => x.id !== c.id))}
+                      onClick={() => deleteCat(c.id)}
                       style={{
                         padding: "4px 10px",
                         background: "#c62828",

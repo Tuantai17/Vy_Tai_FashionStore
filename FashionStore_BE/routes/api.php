@@ -13,24 +13,40 @@ use App\Http\Controllers\Api\BrandController;
 Route::get('/orders', [OrderController::class, 'index']);   // danh sách đơn
 Route::get('/orders/{order}', [OrderController::class, 'show']); // chi tiết 1 đơn
 
+Route::get('/orders/{id}', [OrderController::class, 'show']);
+
+
 // ===== Auth =====
 Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login',    [AuthController::class, 'login']);
-Route::post('/logout',   [AuthController::class, 'logout'])->middleware('auth:sanctum');
+Route::post('/login', [AuthController::class, 'login']);
+Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+
+
 
 // ===== Products =====
 Route::get('/products',       [ProductController::class, 'index']);
 Route::get('/products/{id}',  [ProductController::class, 'show']);
 
-// ===== Categories =====
-Route::prefix('categories')->group(function () {
-    Route::get('/',        [CategoryController::class, 'index']);  // ?q=...&page=...
-    Route::get('{id}',     [CategoryController::class, 'show']);
-    Route::post('/',       [CategoryController::class, 'store']);  // JSON hoặc multipart
-    Route::put('{id}',     [CategoryController::class, 'update']);
-    Route::delete('{id}',  [CategoryController::class, 'destroy']);
-});
 
+Route::get('/categories/{id}/products', [ProductController::class, 'byCategory'])
+    ->whereNumber('id')
+    ->name('categories.products');
+
+// ===== Categories =====
+// Route::prefix('categories')->group(function () {
+//     Route::get('/',        [CategoryController::class, 'index']);  // ?q=...&page=...
+//     Route::get('{id}',     [CategoryController::class, 'show']);
+//     Route::post('/',       [CategoryController::class, 'store']);  // JSON hoặc multipart
+//     Route::put('{id}',     [CategoryController::class, 'update']);
+//     Route::delete('{id}',  [CategoryController::class, 'destroy']);
+// });
+// ===== Categories (CRUD đầy đủ) =====
+Route::get('/categories', [CategoryController::class, 'index']);
+Route::get('/categories/{id}', [CategoryController::class, 'show']);
+Route::post('/categories', [CategoryController::class, 'store']);
+Route::put('/categories/{id}', [CategoryController::class, 'update']);
+Route::delete('/categories/{id}', [CategoryController::class, 'destroy']); // ✅ thêm
+Route::put('/categories/{id}', [CategoryController::class, 'update']); // ✅ update
 // ===== Brands =====
 Route::get('/brands', [BrandController::class, 'index']);
 

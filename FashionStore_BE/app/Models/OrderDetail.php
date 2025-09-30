@@ -42,4 +42,5 @@ class OrderDetail extends Model
         'qty'       => 'int',
         'amount'    => 'float',
     ];
+
 }

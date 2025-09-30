@@ -5,15 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class CategoryController extends Controller
 {
+    // ✅ Lấy tất cả danh mục (Customer đang dùng)
     public function index()
     {
         $cats = Category::all()->map(function ($cat) {
-            $cat->image_url = $cat->image
-                ? url('assets/images/' . $cat->image)
+            $cat->image_url = $cat->image 
+                ? url('assets/images/' . $cat->image) 
                 : null;
             return $cat;
         });
@@ -21,6 +21,7 @@ class CategoryController extends Controller
         return response()->json($cats);
     }
 
+    // ✅ Lấy chi tiết danh mục theo id (Customer đang dùng)
     public function show($id)
     {
         $cat = Category::find($id);
@@ -28,33 +29,141 @@ class CategoryController extends Controller
             return response()->json(['message' => 'Category not found'], 404);
         }
 
-        $cat->image_url = $cat->image
-            ? url('assets/images/' . $cat->image)
+        $cat->image_url = $cat->image 
+            ? url('assets/images/' . $cat->image) 
             : null;
 
         return response()->json($cat);
     }
 
-    public function store(Request $request)
-    {
-        $data = $request->validate([
-            'name'        => 'required|string|min:2|max:100|unique:categories,name',
-            'slug'        => 'nullable|string|max:150|unique:categories,slug',
-            'status'      => 'nullable|in:active,inactive',
-            'description' => 'nullable|string|max:500',
-        ]);
+    // ✅ Thêm mới danh mục (Admin dùng)
+   public function store(Request $request)
+{
+    $data = $request->validate([
+        'name'        => 'required|string|max:1000',
+        'slug'        => 'required|string|max:1000|unique:nqtv_category,slug',
+        'image'       => 'nullable|string|max:1000',
+        'parent_id'   => 'nullable|integer',
+        'sort_order'  => 'nullable|integer',
+        'description' => 'nullable|string',
+        'status'      => 'nullable|integer',
+    ]);
 
-        $data['slug']   = $data['slug'] ?? Str::slug($data['name']);
-        $data['status'] = $data['status'] ?? 'active';
+    $data['created_by'] = 1;
+    $data['status'] = $data['status'] ?? 1; // ✅ nếu không có thì mặc định là 1
 
-        $category = Category::create($data);
+    $cat = Category::create($data);
 
-        return response()->json([
-            'message'  => 'Tạo danh mục thành công',
-            'data'     => $category
-        ], 201);
-    }
+    $cat->image_url = $cat->image 
+        ? url('assets/images/' . $cat->image) 
+        : null;
+
+    return response()->json([
+        'message'  => 'Thêm danh mục thành công',
+        'category' => $cat,
+    ], 201);
 }
+
+public function destroy($id)
+    {
+        $cat = Category::find($id);
+
+        if (!$cat) {
+            return response()->json(['message' => 'Category not found'], 404);
+        }
+
+        $cat->delete();
+
+        return response()->json(['message' => 'Xóa danh mục thành công']);
+    }
+
+
+    public function update(Request $request, $id)
+{
+    $cat = Category::find($id);
+    if (!$cat) {
+        return response()->json(['message' => 'Category not found'], 404);
+    }
+
+    $data = $request->validate([
+        'name'        => 'required|string|max:1000',
+        'slug'        => 'required|string|max:1000|unique:nqtv_category,slug,' . $id,
+        'image'       => 'nullable|string|max:1000',
+        'parent_id'   => 'nullable|integer',
+        'sort_order'  => 'nullable|integer',
+        'description' => 'nullable|string',
+        'status'      => 'nullable|integer',
+    ]);
+
+    $data['updated_by'] = 1; // Hoặc Auth::id()
+
+    $cat->update($data);
+
+    $cat->image_url = $cat->image 
+        ? url('assets/images/' . $cat->image) 
+        : null;
+
+    return response()->json([
+        'message' => 'Cập nhật danh mục thành công',
+'category' => $cat,
+    ]);
+}
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
