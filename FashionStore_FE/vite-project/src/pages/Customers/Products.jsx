@@ -13,13 +13,12 @@ const PLACEHOLDER = "https://placehold.co/300x200?text=No+Image";
 
 export default function Products({ addToCart }) {
   const location = useLocation();
-  const defaultCate = location.state?.categoryId ?? ""; // có thể là string/number
+  const defaultCate = location.state?.categoryId ?? "";
 
-  const [items, setItems] = useState([]);       // tất cả sản phẩm (để hiển thị khi không lọc theo danh mục)
-  const [filtered, setFiltered] = useState([]); // kết quả hiển thị sau khi áp bộ lọc
+  const [items, setItems] = useState([]);
+  const [filtered, setFiltered] = useState([]);
   const [categories, setCategories] = useState([]);
 
-  // filter states
   const [category, setCategory] = useState(defaultCate === "" ? "" : Number(defaultCate));
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
@@ -27,14 +26,12 @@ export default function Products({ addToCart }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // cache: { [cateId:number]: Product[] }
   const catCache = useRef({});
 
   const normalizeList = (data) => (Array.isArray(data) ? data : data?.data ?? []);
   const priceOf = (p) =>
     Number(p?.price ?? p?.price_sale ?? p?.sale_price ?? p?.regular_price ?? p?.amount ?? 0);
 
-  // ---------- Tải categories + all products ----------
   useEffect(() => {
     const ac = new AbortController();
     (async () => {
@@ -51,7 +48,7 @@ export default function Products({ addToCart }) {
         if (!resAll.ok) throw new Error(`Products HTTP ${resAll.status}`);
         const all = normalizeList(await resAll.json());
         setItems(all);
-        setFiltered(all); // mặc định hiển thị tất cả
+        setFiltered(all);
       } catch (e) {
         if (e.name !== "AbortError") {
           console.error(e);
@@ -64,7 +61,6 @@ export default function Products({ addToCart }) {
     return () => ac.abort();
   }, []);
 
-  // ---------- Lấy toàn bộ id con (duyệt sâu) ----------
   const getDescendantIds = (id) => {
     const want = String(id);
     const out = [];
@@ -79,7 +75,6 @@ export default function Products({ addToCart }) {
     return out;
   };
 
-  // ---------- API /categories/:id/products (có cache) ----------
   const fetchProductsOfCategory = async (cateId) => {
     const key = Number(cateId);
     if (catCache.current[key]) return catCache.current[key];
@@ -90,7 +85,6 @@ export default function Products({ addToCart }) {
     return list;
   };
 
-  // ---------- Áp bộ lọc: danh mục + giá ----------
   useEffect(() => {
     let cancelled = false;
 
@@ -103,20 +97,16 @@ export default function Products({ addToCart }) {
 
     const run = async () => {
       try {
-        // Không chọn danh mục -> hiển thị tất cả + áp giá
         if (category === "" || category === null || isNaN(Number(category))) {
           setFiltered(applyPrice(items));
           return;
         }
 
-        // Gom sản phẩm của chính danh mục + tất cả danh mục con (nếu có)
         const descendants = getDescendantIds(Number(category));
         const targetIds = [...new Set([Number(category), ...descendants])];
 
-        // Gọi song song /api/categories/:id/products
         const chunks = await Promise.all(targetIds.map((id) => fetchProductsOfCategory(id)));
 
-        // Gộp & khử trùng lặp theo product.id
         const mergedMap = new Map();
         for (const arr of chunks) {
           for (const p of arr) mergedMap.set(p.id, p);
@@ -130,16 +120,13 @@ export default function Products({ addToCart }) {
       }
     };
 
-    // chỉ chạy sau khi đã có categories (để tìm con)
     if (categories.length) run();
     return () => {
       cancelled = true;
     };
   }, [category, minPrice, maxPrice, categories, items]);
 
-  // ---------- UI ----------
   const options = useMemo(() => {
-    // Sắp xếp để cha hiện trước con (nhẹ nhàng theo parent_id)
     const toNum = (v) => (v == null ? null : Number(v));
     return [...categories].sort((a, b) => (toNum(a.parent_id) ?? -1) - (toNum(b.parent_id) ?? -1));
   }, [categories]);
@@ -158,8 +145,17 @@ export default function Products({ addToCart }) {
   }
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2 style={{ marginBottom: 16, color: "#388e3c" }}>🌿 Tất cả sản phẩm</h2>
+      <div 
+      style={{ 
+        padding: "20px 16px",   // padding trong nhỏ
+        maxWidth: 1400,         // tăng chiều rộng để giảm khoảng trắng
+        margin: "0 auto"        // vẫn căn giữa
+      }}
+      >
+
+      <h2 style={{ marginBottom: 16, color: "#388e3c", textAlign: "center" }}>
+        🌿 Tất cả sản phẩm
+      </h2>
 
       {/* Bộ lọc */}
       <div
@@ -261,46 +257,55 @@ export default function Products({ addToCart }) {
       </div>
 
       {/* Danh sách sản phẩm */}
-      <div
-        style={{
-          display: "flex",
-          gap: 24,
-          flexWrap: "wrap",
-          justifyContent: "center",
-        }}
-      >
+      <style>
+        {`
+          .products-grid{
+            display:grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 24px;
+          }
+          @media (max-width: 1024px){
+            .products-grid{ grid-template-columns: repeat(3, minmax(0,1fr)); }
+          }
+          @media (max-width: 768px){
+            .products-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+          }
+          @media (max-width: 480px){
+            .products-grid{ grid-template-columns: repeat(1, minmax(0,1fr)); }
+          }
+          .pcell{
+            display:flex;
+            flex-direction:column;
+          }
+          .pcell .add-btn{
+            margin-top:10px;
+            background:#388e3c;
+            color:#fff;
+            border:0;
+            padding:8px 12px;
+            border-radius:8px;
+            cursor:pointer;
+            align-self:flex-end;
+          }
+        `}
+      </style>
+
+      <div className="products-grid">
         {filtered.length > 0 ? (
           filtered.map((p) => (
-            <div key={p.id} style={{ position: "relative" }}>
+            <div key={p.id} className="pcell">
               <ProductCard
                 p={{
                   ...p,
                   image:
                     p.image_url || p.thumbnail_url || p.thumbnail || p.image || PLACEHOLDER,
                 }}
+                
               />
-              {typeof addToCart === "function" && (
-                <button
-                  onClick={() => addToCart(p)}
-                  style={{
-                    position: "absolute",
-                    right: 10,
-                    bottom: 10,
-                    background: "#388e3c",
-                    color: "#fff",
-                    border: 0,
-                    padding: "6px 10px",
-                    borderRadius: 8,
-                    cursor: "pointer",
-                  }}
-                >
-                  + Giỏ
-                </button>
-              )}
             </div>
           ))
         ) : (
-          <p style={{ marginTop: 24, textAlign: "center", color: "#666" }}>
+          <p style={{ textAlign: "center", color: "#666", gridColumn: "1 / -1" }}>
             😢 Không có sản phẩm nào.
           </p>
         )}

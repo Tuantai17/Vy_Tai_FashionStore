@@ -26,6 +26,8 @@ class Order extends Model
         'total',
         'payment_method',
         'created_by',
+        'status_step', 
+        'step_code',
     ];
 
     // Quan hệ gốc bạn đang dùng
@@ -35,10 +37,12 @@ class Order extends Model
     }
 
     // Alias để FE dùng 'items'
-    public function items()
-    {
-        $this->hasMany(OrderDetail::class, 'order_id');
-    }
+   public function items()
+{
+    return $this->hasMany(OrderDetail::class, 'order_id');
+}
+
+
 
     public function show(Order $order)
 {
