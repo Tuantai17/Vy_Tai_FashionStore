@@ -163,213 +163,217 @@ export default function EditProduct() {
 
   // --- small UI helpers ---
   const Label = ({ children, req }) => (
-    <label className="block text-sm font-medium text-gray-700 mb-1">
-      {children} {req && <span className="text-red-500">*</span>}
+    <label className="admin-form-label">
+      {children}
+      {req && <span className="admin-form-label-required">{' '}*</span>}
     </label>
   );
-  const Help = ({ children }) => <p className="mt-1 text-xs text-gray-500">{children}</p>;
+  const Help = ({ children }) => <p className="admin-form-hint">{children}</p>;
   const Err = ({ name }) =>
-    fieldErrors?.[name] ? <p className="mt-1 text-sm text-red-600">{fieldErrors[name][0]}</p> : null;
+    fieldErrors?.[name] ? <p className="admin-form-error-text">{fieldErrors[name][0]}</p> : null;
 
-  if (loading) return <div className="p-6">Đang tải…</div>;
+  if (loading) return <div className="admin-form-card admin-form-card--wide">Dang tai...</div>;
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
-      {error && (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700">
-          {error}
-        </div>
-      )}
+    <div className="admin-form-card admin-form-card--wide">
+      <ul className="admin-breadcrumb">
+        <li><Link to="/admin">Admin</Link></li>
+        <li className="admin-breadcrumb-sep">/</li>
+        <li><Link to="/admin/products">San pham</Link></li>
+        <li className="admin-breadcrumb-sep">/</li>
+        <li>Chinh sua #${id}</li>
+      </ul>
 
-      <div className="mb-6">
-        <nav className="text-sm text-gray-500 mb-1">
-          <Link to="/admin" className="hover:text-gray-700">Admin</Link>
-          <span className="mx-1">/</span>
-          <Link to="/admin/products" className="hover:text-gray-700">Sản phẩm</Link>
-          <span className="mx-1">/</span>
-          <span className="text-gray-900 font-medium">Chỉnh sửa #{id}</span>
-        </nav>
-        <h1 className="text-2xl font-bold tracking-tight">✏️ Chỉnh sửa sản phẩm</h1>
+      <div className="admin-form-heading">
+        <div className="admin-form-icon admin-form-icon--pencil">✏️</div>
+        <div>
+          <h1 className="admin-form-title">Chinh sua san pham</h1>
+          <p className="admin-form-subtitle">Cap nhat chi tiet cho san pham #${id}</p>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* cột chính */}
-        <div className="lg:col-span-2 space-y-6">
-          <section className="bg-white rounded-2xl shadow-sm border border-gray-100">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-900">Thông tin cơ bản</h2>
+      {error && <p className="admin-form-error">{error}</p>}
+
+      <form onSubmit={handleSubmit} className="admin-form-layout">
+        <div className="admin-form-main">
+          <section className="admin-section-card">
+            <div className="admin-section-card__header">
+              <h2 className="admin-section-card__title">Thong tin co ban</h2>
+              <p className="admin-section-card__subtitle">Cap nhat ten, gia va so luong san pham.</p>
             </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <Label req>Tên sản phẩm</Label>
+            <div className="admin-section-card__body">
+              <div className="admin-form-field">
+                <Label req>Ten san pham</Label>
                 <input
                   name="name"
                   value={form.name}
                   onChange={onChange}
                   required
-                  className="w-full rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-blue-500 p-2.5"
+                  className="admin-form-control"
                 />
-                <Help>Slug: <span className="font-mono">{form.slug || makeSlug(form.name) || "—"}</span></Help>
+                <Help>Slug hien tai: <span className="admin-form-meta">{form.slug || makeSlug(form.name) || "--"}</span></Help>
                 <Err name="name" />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label>Giá gốc</Label>
+              <div className="admin-section-grid admin-section-grid--3">
+                <div className="admin-form-field">
+                  <Label>Gia goc</Label>
                   <input
                     name="price_root"
                     type="text"
                     inputMode="numeric"
                     value={form.price_root}
                     onChange={onPriceChange}
-                    placeholder="VD: 120000"
-                    className="w-full rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-blue-500 p-2.5"
+                    placeholder="Vi du: 120000"
+                    className="admin-form-control"
                   />
-                  <Help>Gõ số, có thể nhập 123.000/123,000; hệ thống tự lọc ký tự.</Help>
+                  <Help>Co the nhap 123000, 123.000 hoac 123,000; he thong se tu loc ky tu.</Help>
                   <Err name="price_root" />
                 </div>
-                <div>
-                  <Label>Giá bán</Label>
+                <div className="admin-form-field">
+                  <Label>Gia ban</Label>
                   <input
                     name="price_sale"
                     type="text"
                     inputMode="numeric"
                     value={form.price_sale}
                     onChange={onPriceChange}
-                    placeholder="0"
-                    className="w-full rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-blue-500 p-2.5"
+                    placeholder="De 0 neu khong giam"
+                    className="admin-form-control"
                   />
-                  <Help>Để 0 nếu không giảm.</Help>
+                  <Help>De 0 neu khong co gia khuyen mai.</Help>
                   <Err name="price_sale" />
                 </div>
-                <div>
-                  <Label>Số lượng</Label>
+                <div className="admin-form-field">
+                  <Label>So luong</Label>
                   <input
                     name="qty"
                     type="number"
-                    min="0"
-                    step="1"
                     value={form.qty}
                     onChange={onChange}
                     onWheel={(e) => e.currentTarget.blur()}
-                    className="w-full rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-blue-500 p-2.5"
+                    className="admin-form-control"
                   />
                   <Err name="qty" />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Danh mục</Label>
+              <div className="admin-section-grid admin-section-grid--2">
+                <div className="admin-form-field">
+                  <Label>Danh muc</Label>
                   <select
                     name="category_id"
                     value={form.category_id ?? ""}
                     onChange={onChange}
-                    className="w-full rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-blue-500 p-2.5 bg-white"
+                    className="admin-form-control admin-form-select"
                   >
-                    <option value="">-- Chọn danh mục --</option>
+                    <option value="">-- Chon danh muc --</option>
                     {categories.map((c) => (
-                      <option key={c.id} value={c.id}>{c.cate_name || c.name}</option>
+                      <option key={c.id} value={c.id}>
+                        {c.cate_name || c.name}
+                      </option>
                     ))}
                   </select>
                   <Err name="category_id" />
                 </div>
-                <div>
-                  <Label req>Thương hiệu</Label>
+                <div className="admin-form-field">
+                  <Label req>Thuong hieu</Label>
                   <select
                     name="brand_id"
                     value={form.brand_id ?? ""}
                     onChange={onChange}
                     required
-                    className="w-full rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-blue-500 p-2.5 bg-white"
+                    className="admin-form-control admin-form-select"
                   >
-                    <option value="">-- Chọn thương hiệu --</option>
+                    <option value="">-- Chon thuong hieu --</option>
                     {brands.map((b) => (
-                      <option key={b.id} value={b.id}>{b.name}</option>
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
                     ))}
                   </select>
                   <Err name="brand_id" />
                 </div>
               </div>
 
-              <div>
-                <Label>Trạng thái</Label>
+              <div className="admin-form-field">
+                <Label>Trang thai</Label>
                 <select
                   name="status"
                   value={form.status}
                   onChange={onChange}
-                  className="w-full rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-blue-500 p-2.5 bg-white"
+                  className="admin-form-control admin-form-select"
                 >
-                  <option value="1">Hiển thị</option>
-                  <option value="0">Ẩn</option>
+                  <option value="1">Hien thi</option>
+                  <option value="0">An</option>
                 </select>
               </div>
 
-              <div>
-                <Label>Mô tả</Label>
+              <div className="admin-form-field">
+                <Label>Mo ta</Label>
                 <textarea
                   name="description"
                   rows={5}
                   value={form.description}
                   onChange={onChange}
-                  className="w-full rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-blue-500 p-2.5"
+                  className="admin-form-control admin-form-textarea"
                 />
                 <Err name="description" />
               </div>
             </div>
           </section>
 
-          <section className="bg-white rounded-2xl shadow-sm border border-gray-100">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-900">Ảnh sản phẩm</h2>
+          <section className="admin-section-card">
+            <div className="admin-section-card__header">
+              <h2 className="admin-section-card__title">Anh san pham</h2>
+              <p className="admin-section-card__subtitle">Quan ly anh hien thi tren cua hang.</p>
             </div>
-            <div className="p-5">
-              <div className="flex items-start gap-4 flex-col md:flex-row">
-                <div className="w-40 h-40 rounded-lg border border-dashed border-gray-300 overflow-hidden bg-gray-50 flex items-center justify-center">
+            <div className="admin-section-card__body">
+              <div className="admin-form-field">
+                <div className="admin-upload-preview">
                   {previewUrl ? (
-                    <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                    <img src={previewUrl} alt="Preview" className="admin-upload-image" />
                   ) : (
-                    <span className="text-gray-400 text-sm">Không có ảnh</span>
+                    <div className="admin-upload-placeholder">Chua co anh</div>
                   )}
-                </div>
-                <div className="flex-1">
-                  <Label>Đổi ảnh (tuỳ chọn)</Label>
-                  <input
-                    type="file"
-                    name="thumbnail"
-                    accept="image/*"
-                    onChange={onChange}
-                    className="block w-full text-sm text-gray-900 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                  />
-                  <Help>Nếu không chọn, hệ thống giữ ảnh cũ.</Help>
-                  <Err name="thumbnail" />
+                  <div className="admin-upload-actions">
+                    <label className="admin-form-label">Doi anh (tuy chon)</label>
+                    <input
+                      type="file"
+                      name="thumbnail"
+                      accept="image/*"
+                      onChange={onChange}
+                      className="admin-form-control admin-form-file"
+                    />
+                    <p className="admin-upload-note">Neu khong chon, he thong giu anh cu.</p>
+                    <Err name="thumbnail" />
+                  </div>
                 </div>
               </div>
             </div>
           </section>
         </div>
 
-        {/* sidebar hành động */}
-        <div className="space-y-6">
-          <section className="bg-white rounded-2xl shadow-sm border border-gray-100">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-900">Hành động</h2>
+        <div className="admin-form-side">
+          <section className="admin-section-card">
+            <div className="admin-section-card__header">
+              <h2 className="admin-section-card__title">Hanh dong</h2>
+              <p className="admin-section-card__subtitle">Luu thay doi hoac quay lai danh sach san pham.</p>
             </div>
-            <div className="p-5 space-y-3">
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-white font-medium hover:bg-blue-700 disabled:bg-gray-400"
-              >
-                {saving ? "Đang lưu…" : "Lưu thay đổi"}
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/admin/products")}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Hủy
-              </button>
+            <div className="admin-section-card__body">
+              <p className="admin-form-meta">ID san pham: #${id}</p>
+              <div className="admin-form-actions admin-form-actions--column">
+                <button type="submit" disabled={saving} className="admin-btn admin-btn--primary">
+                  {saving ? "Dang luu..." : "Luu thay doi"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/admin/products")}
+                  className="admin-btn admin-btn--ghost"
+                >
+                  Huy
+                </button>
+              </div>
             </div>
           </section>
         </div>

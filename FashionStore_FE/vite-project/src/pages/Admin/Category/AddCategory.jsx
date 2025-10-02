@@ -12,7 +12,7 @@ export default function AddCategory() {
     sort_order: "",
     parent_id: "",
     image: "",
-    status: 1, // ✅ mặc định là 1
+    status: 1,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -35,7 +35,7 @@ export default function AddCategory() {
       });
 
       if (!res.ok) {
-        let message = "Thêm thất bại";
+        let message = "Them that bai";
         try {
           const errData = await res.json();
           message = errData.message || message;
@@ -47,8 +47,8 @@ export default function AddCategory() {
       }
 
       const data = await res.json();
-      alert(data.message || "Thêm danh mục thành công!");
-      navigate("/admin/categories"); // ✅ quay về danh sách
+      alert(data.message || "Da them danh muc thanh cong!");
+      navigate("/admin/categories");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -57,73 +57,101 @@ export default function AddCategory() {
   };
 
   return (
-    <div className="p-6 max-w-xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-4">Thêm danh mục</h1>
+    <div className="admin-form-card">
+      <div className="admin-form-heading">
+        <div className="admin-form-icon">+</div>
+        <div>
+          <h1 className="admin-form-title">Them danh muc</h1>
+          <p className="admin-form-subtitle">Nhap thong tin danh muc de sap xep san pham khoa hoc.</p>
+        </div>
+      </div>
 
-      {error && <p className="text-red-600 mb-3">{error}</p>}
+      {error && <p className="admin-form-error">{error}</p>}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="text"
-          name="name"
-          placeholder="Tên danh mục"
-          value={form.name}
-          onChange={handleChange}
-          required
-          className="border p-2 w-full rounded"
-        />
+      <form onSubmit={handleSubmit} className="admin-form-body">
+        <div className="admin-form-field">
+          <label className="admin-form-label">Ten danh muc *</label>
+          <input
+            type="text"
+            name="name"
+            placeholder="Vi du: Ao so mi"
+            value={form.name}
+            onChange={handleChange}
+            required
+            className="admin-form-control"
+          />
+        </div>
 
-        <input
-          type="text"
-          name="slug"
-          placeholder="Slug (tùy chọn)"
-          value={form.slug}
-          onChange={handleChange}
-          className="border p-2 w-full rounded"
-        />
+        <div className="admin-form-grid admin-form-grid--2">
+          <div className="admin-form-field">
+            <label className="admin-form-label">Slug (tuy chon)</label>
+            <input
+              type="text"
+              name="slug"
+              placeholder="ao-so-mi"
+              value={form.slug}
+              onChange={handleChange}
+              className="admin-form-control"
+            />
+          </div>
+          <div className="admin-form-field">
+            <label className="admin-form-label">Thu tu hien thi</label>
+            <input
+              type="number"
+              name="sort_order"
+              placeholder="0"
+              value={form.sort_order}
+              onChange={handleChange}
+              className="admin-form-control"
+            />
+          </div>
+        </div>
 
-        <textarea
-          name="description"
-          placeholder="Mô tả"
-          value={form.description}
-          onChange={handleChange}
-          className="border p-2 w-full rounded"
-        />
+        <div className="admin-form-field">
+          <label className="admin-form-label">Mo ta</label>
+          <textarea
+            name="description"
+            placeholder="Mo ta ngan gon cho danh muc"
+            value={form.description}
+            onChange={handleChange}
+            className="admin-form-control admin-form-textarea"
+            rows="4"
+          />
+        </div>
 
-        <input
-          type="number"
-          name="sort_order"
-          placeholder="Thứ tự hiển thị"
-          value={form.sort_order}
-          onChange={handleChange}
-          className="border p-2 w-full rounded"
-        />
+        <div className="admin-form-grid admin-form-grid--2">
+          <div className="admin-form-field">
+            <label className="admin-form-label">Parent ID (neu co)</label>
+            <input
+              type="number"
+              name="parent_id"
+              placeholder="ID danh muc cha"
+              value={form.parent_id}
+              onChange={handleChange}
+              className="admin-form-control"
+            />
+          </div>
+          <div className="admin-form-field">
+            <label className="admin-form-label">Ten file anh (neu co)</label>
+            <input
+              type="text"
+              name="image"
+              placeholder="category.png"
+              value={form.image}
+              onChange={handleChange}
+              className="admin-form-control"
+            />
+          </div>
+        </div>
 
-        <input
-          type="number"
-          name="parent_id"
-          placeholder="Parent ID (nếu có)"
-          value={form.parent_id}
-          onChange={handleChange}
-          className="border p-2 w-full rounded"
-        />
-
-        <input
-          type="text"
-          name="image"
-          placeholder="Tên file ảnh (nếu có)"
-          value={form.image}
-          onChange={handleChange}
-          className="border p-2 w-full rounded"
-        />
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
-        >
-          {loading ? "Đang lưu..." : "Lưu"}
-        </button>
+        <div className="admin-form-actions">
+          <button type="submit" disabled={loading} className="admin-btn admin-btn--primary">
+            {loading ? "Dang luu..." : "Luu"}
+          </button>
+          <button type="button" onClick={() => navigate("/admin/categories")} className="admin-btn admin-btn--ghost">
+            Huy
+          </button>
+        </div>
       </form>
     </div>
   );

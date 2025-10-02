@@ -65,44 +65,50 @@ function Layout({ children }) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="px-4 py-3 border-b flex items-center justify-between">
-        <div className="font-semibold">🍃 StoreVegetables</div>
-        <nav className="flex gap-4 items-center">
-          <NavLink to="/" end>Trang chủ</NavLink>
-          <NavLink to="/products">Sản phẩm</NavLink>
-          <NavLink to="/cart">Giỏ hàng</NavLink>
-          <NavLink to="/contact">Liên hệ</NavLink>
+<header className="px-4 py-3 border-b flex items-center justify-between">
+  {/* Logo bên trái */}
+<div className="font-semibold -ml-2">
+  <a href="http://localhost:5173/">
+    <img
+      src="http://127.0.0.1:8000/assets/images/logoVT.png"
+      alt="Logo"
+      style={{ width: "200px", height: "60px", objectFit: "contain", cursor: "pointer" }}
+    />
+  </a>
+</div>
 
-          {user ? (
-            <>
-              <span style={{ color: "green", fontWeight: 600 }}>
-                👋 Xin chào, {user.name}
-              </span>
-              <button
-                onClick={handleLogout}
-                style={{
-                  marginLeft: 12,
-                  background: "#d32f2f",
-                  color: "#fff",
-                  border: 0,
-                  borderRadius: 8,
-                  padding: "6px 10px",
-                  cursor: "pointer",
-                }}
-              >
-                Đăng xuất
-              </button>
-            </>
-          ) : (
-            <>
-              <NavLink to="/contact">Liên hệ</NavLink>
-              <NavLink to="/register">Đăng ký</NavLink>
-              <NavLink to="/login">Đăng nhập</NavLink>
 
-            </>
-          )}
-        </nav>
-      </header>
+  {/* Menu ở giữa */}
+  <nav className="flex gap-6 items-center mx-auto">
+    <NavLink to="/" end>Trang chủ</NavLink>
+    <NavLink to="/products">Sản phẩm</NavLink>
+    <NavLink to="/cart">Giỏ hàng</NavLink>
+    <NavLink to="/contact">Liên hệ</NavLink>
+  </nav>
+
+  {/* User / Logout bên phải */}
+  <div className="flex items-center gap-3">
+    {user ? (
+      <>
+        <span style={{ color: "green", fontWeight: 600 }}>
+          👋 Xin chào, {user.name}
+        </span>
+        <button
+          onClick={handleLogout}
+          className="bg-red-600 text-white px-3 py-1 rounded"
+        >
+          Đăng xuất
+        </button>
+      </>
+    ) : (
+      <>
+        <NavLink to="/register">Đăng ký</NavLink>
+        <NavLink to="/login">Đăng nhập</NavLink>
+      </>
+    )}
+  </div>
+</header>
+
 
       <main className="flex-1 p-4">{children}</main>
 
