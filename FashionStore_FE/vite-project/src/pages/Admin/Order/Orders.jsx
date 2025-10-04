@@ -1,11 +1,10 @@
-// src/pages/Admin/Order/Orders.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API_BASE = "http://127.0.0.1:8000/api";
 const VND = new Intl.NumberFormat("vi-VN");
 
-// ===== 5 trạng thái theo yêu cầu
+// ===== 5 trạng thái theo yêu cầu (giữ nguyên UI)
 export const STEPS = [
   { key: "pending",   label: "Chờ xác nhận" },
   { key: "confirmed", label: "Đã xác nhận" },
@@ -14,16 +13,15 @@ export const STEPS = [
   { key: "delivered", label: "Giao thành công" },
 ];
 
-// ===== chuẩn hoá status bất kể API trả gì
+// ===== Chuẩn hoá status; thêm 'canceled' nhưng KHÔNG đổi UI
 const normalizeStatusKey = (s) => {
   if (s == null) return "pending";
   const str = String(s).toLowerCase();
 
-  // map số và chuỗi sang 5 key trên
   const map = {
     "0": "pending",
     "1": "confirmed",
-    "2": "ready",
+    "2": "canceled",   // ← khi backend set status=2
     "3": "shipping",
     "4": "delivered",
 
@@ -37,13 +35,16 @@ const normalizeStatusKey = (s) => {
     delivered: "delivered",
     completed: "delivered",
     done: "delivered",
+
+    canceled: "canceled",
+    cancelled: "canceled",
   };
   return map[str] || "pending";
 };
 
 const stepIndex = (key) => Math.max(0, STEPS.findIndex((s) => s.key === key));
 
-// ===== headers kèm token (nếu có)
+// headers
 const authHeaders = () => {
   const h = { Accept: "application/json", "Content-Type": "application/json" };
   const token = localStorage.getItem("token");
@@ -59,7 +60,7 @@ export default function Orders() {
   const [search, setSearch] = useState("");
   const [savingId, setSavingId] = useState(null); // id đang update
 
-  // ===== load list
+  // load list
   useEffect(() => {
     let ignore = false;
 
@@ -79,11 +80,10 @@ export default function Orders() {
 
         if (ignore) return;
 
-        // gắn statusKey đã chuẩn hoá cho từng order
         setOrders(
           list.map((o) => ({
             ...o,
-           statusKey: normalizeStatusKey(o.status_step ?? o.status_key ?? o.status),
+            statusKey: normalizeStatusKey(o.status_step ?? o.status_key ?? o.status),
           }))
         );
       } catch (e) {
@@ -99,70 +99,61 @@ export default function Orders() {
     };
   }, [search]);
 
-  // ===== cập nhật trạng thái (đa dạng endpoint để khớp backend)
-  // ===== cập nhật trạng thái: CHỈ ghi cột step, không chạm cột status
-const updateStatus = async (order, newKey) => {
-  const oldKey = order.statusKey;
-  if (oldKey === newKey) return;
+  // cập nhật step (giữ nguyên, chỉ không cho update nếu canceled)
+  const updateStatus = async (order, newKey) => {
+    if (order.statusKey === "canceled") return; // KHÓA nếu đã hủy
+    const oldKey = order.statusKey;
+    if (oldKey === newKey) return;
 
-  // Optimistic UI
-  setOrders((prev) =>
-    prev.map((o) => (o.id === order.id ? { ...o, statusKey: newKey } : o))
-  );
-  setSavingId(order.id);
-
-  const idx = stepIndex(newKey);
-  const payloadStepOnly = {
-    // gửi nhiều tên field phổ biến – backend nhận tên nào có thì dùng tên đó
-    status_step: newKey,
-    status_key: newKey,
-    workflow_status: newKey,
-    step_code: idx,
-    ...(newKey === "confirmed" && { confirmed_at: new Date().toISOString() }),
-    ...(newKey === "ready"     && { ready_at: new Date().toISOString() }),
-    ...(newKey === "shipping"  && { shipped_at: new Date().toISOString() }),
-    ...(newKey === "delivered" && { delivered_at: new Date().toISOString() }),
-  };
-
-  const attempts = [
-    // endpoint chuyên update status (nếu bạn có)
-    { url: `${API_BASE}/orders/${order.id}/status`, method: "POST", body: payloadStepOnly },
-    
-
-    // endpoint chung update-status
-    { url: `${API_BASE}/orders/update-status`,      method: "POST", body: { id: order.id, ...payloadStepOnly } },
-
-    // fallback: sửa qua /orders/:id nhưng chỉ gửi cột step
-    { url: `${API_BASE}/orders/${order.id}`,        method: "PATCH", body: payloadStepOnly },
-    { url: `${API_BASE}/orders/${order.id}`,        method: "POST",  body: { _method: "PUT", ...payloadStepOnly } },
-  ];
-
-  let ok = false, lastStatus = 0, lastText = "";
-
-  for (const a of attempts) {
-    try {
-      const res = await fetch(a.url, {
-        method: a.method,
-        headers: authHeaders(),
-        body: JSON.stringify(a.body),
-      });
-      lastStatus = res.status;
-      if (res.ok) { ok = true; break; }
-      try { lastText = await res.text(); } catch {}
-    } catch (e) { lastText = String(e); }
-  }
-
-  setSavingId(null);
-
-  if (!ok) {
-    // revert nếu thất bại
+    // optimistic
     setOrders((prev) =>
-      prev.map((o) => (o.id === order.id ? { ...o, statusKey: oldKey } : o))
+      prev.map((o) => (o.id === order.id ? { ...o, statusKey: newKey } : o))
     );
-    alert(`Cập nhật trạng thái thất bại. Vui lòng thử lại.\n(last=${lastStatus} ${lastText || ""})`);
-  }
-};
+    setSavingId(order.id);
 
+    const idx = stepIndex(newKey);
+    const payloadStepOnly = {
+      status_step: newKey,
+      status_key: newKey,
+      workflow_status: newKey,
+      step_code: idx,
+      ...(newKey === "confirmed" && { confirmed_at: new Date().toISOString() }),
+      ...(newKey === "ready"     && { ready_at: new Date().toISOString() }),
+      ...(newKey === "shipping"  && { shipped_at: new Date().toISOString() }),
+      ...(newKey === "delivered" && { delivered_at: new Date().toISOString() }),
+    };
+
+    const attempts = [
+      { url: `${API_BASE}/orders/${order.id}/status`, method: "POST", body: payloadStepOnly },
+      { url: `${API_BASE}/orders/update-status`,      method: "POST", body: { id: order.id, ...payloadStepOnly } },
+      { url: `${API_BASE}/orders/${order.id}`,        method: "PATCH", body: payloadStepOnly },
+      { url: `${API_BASE}/orders/${order.id}`,        method: "POST",  body: { _method: "PUT", ...payloadStepOnly } },
+    ];
+
+    let ok = false, lastStatus = 0, lastText = "";
+
+    for (const a of attempts) {
+      try {
+        const res = await fetch(a.url, {
+          method: a.method,
+          headers: authHeaders(),
+          body: JSON.stringify(a.body),
+        });
+        lastStatus = res.status;
+        if (res.ok) { ok = true; break; }
+        try { lastText = await res.text(); } catch {}
+      } catch (e) { lastText = String(e); }
+    }
+
+    setSavingId(null);
+
+    if (!ok) {
+      setOrders((prev) =>
+        prev.map((o) => (o.id === order.id ? { ...o, statusKey: oldKey } : o))
+      );
+      alert(`Cập nhật trạng thái thất bại. Vui lòng thử lại.\n(last=${lastStatus} ${lastText || ""})`);
+    }
+  };
 
   const badgeStyle = (key) => {
     const i = stepIndex(key);
@@ -223,7 +214,9 @@ const updateStatus = async (order, newKey) => {
           </thead>
           <tbody>
             {orders.map((o) => {
-              const idx = stepIndex(o.statusKey);
+              const canceled = o.statusKey === "canceled";
+              const idx = canceled ? -1 : stepIndex(o.statusKey);
+
               return (
                 <tr key={o.id} style={{ borderTop: "1px solid #eee", verticalAlign: "middle" }}>
                   <td>{o.id}</td>
@@ -232,20 +225,20 @@ const updateStatus = async (order, newKey) => {
                   <td>{o.phone}</td>
                   <td align="right">₫{VND.format(Number(o.total ?? 0))}</td>
                   <td>
-                    {/* thanh bước có thể click */}
+                    {/* thanh bước – nếu canceled → xám & không click */}
                     <div style={{ display: "grid", gridTemplateColumns: `repeat(${STEPS.length}, 1fr)`, gap: 6 }}>
                       {STEPS.map((s, i) => {
-                        const done = i <= idx;
+                        const done = !canceled && i <= idx;
                         return (
                           <div
                             key={s.key}
-                            onClick={() => !savingId && updateStatus(o, s.key)}
-                            title={s.label}
+                            onClick={() => (!canceled && !savingId) && updateStatus(o, s.key)}
+                            title={canceled ? "Đã hủy" : s.label}
                             style={{
                               height: 8,
                               borderRadius: 999,
-                              background: done ? "#10b981" : "#e5e7eb",
-                              cursor: savingId ? "not-allowed" : "pointer",
+                              background: canceled ? "#e5e7eb" : (done ? "#10b981" : "#e5e7eb"),
+                              cursor: (canceled || savingId) ? "not-allowed" : "pointer",
                               transition: "all .15s ease",
                             }}
                           />
@@ -255,9 +248,14 @@ const updateStatus = async (order, newKey) => {
 
                     {/* nhãn trạng thái */}
                     <div style={{ marginTop: 6 }}>
-                      <span style={badgeStyle(o.statusKey)}>
-                        {STEPS[idx]?.label || "Trạng thái"}
-                        {savingId === o.id && " • đang lưu..."}
+                      <span style={
+                        canceled
+                          ? { background:"#fef2f2", color:"#991b1b", border:"1px solid #fecaca",
+                              padding:"2px 8px", borderRadius:999, fontSize:12, fontWeight:700 }
+                          : badgeStyle(o.statusKey)
+                      }>
+                        {canceled ? "Đã hủy" : (STEPS[idx]?.label || "Trạng thái")}
+                        {savingId === o.id && !canceled && " • đang lưu..."}
                       </span>
                     </div>
                   </td>

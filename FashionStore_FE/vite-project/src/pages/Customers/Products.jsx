@@ -251,7 +251,7 @@ export default function Products({ addToCart }) {
               cursor: "pointer",
             }}
           >
-            🔄 Bỏ lọc
+            🔄
           </button>
         </div>
       </div>

@@ -57,6 +57,9 @@ export default function OrderTracking() {
   const [canceling, setCanceling] = useState(false);
   const pollRef = useRef(null);
 
+  // map productId -> còn được review không
+  const [canReviewMap, setCanReviewMap] = useState({});
+
   const fmt = (v) => (v == null ? 0 : Number(v)).toLocaleString("vi-VN");
   const fmtTime = (t) => {
     if (!t) return "";
@@ -191,7 +194,35 @@ export default function OrderTracking() {
     return out;
   };
 
-  // fetch 1 đơn theo code/id
+  // lấy quyền review cho từng item
+  const refreshCanReview = async (items, signal) => {
+    const token = localStorage.getItem("token");
+    if (!token || !Array.isArray(items)) {
+      setCanReviewMap({});
+      return;
+    }
+    const m = {};
+    for (const it of items) {
+      const pid = it.product_id || it.product?.id || it.id;
+      if (!pid) continue;
+      try {
+        const res = await fetch(`${API_BASE}/products/${pid}/can-review`, {
+          signal,
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (res.ok) {
+          const d = await res.json();
+          m[pid] = !!(d.canReview ?? d.can ?? d.allowed);
+        }
+      } catch {}
+    }
+    setCanReviewMap(m);
+  };
+
+  // fetch đơn
   const fetchOrder = async (signal) => {
     if (!code.trim()) return;
     setLoading(true);
@@ -212,7 +243,7 @@ export default function OrderTracking() {
         }
       } catch {}
 
-      // 2) nếu chưa có items => fallback /orders/{id}
+      // 2) fallback /orders/{id}
       if (!o || !Array.isArray(o.items) || o.items.length === 0) {
         try {
           const resB = await fetch(endpointB, { signal, headers: { Accept: "application/json" } });
@@ -228,10 +259,13 @@ export default function OrderTracking() {
 
       setOrder(o);
 
-      // Hydrate items để có name/price/thumb đầy đủ
+      // Hydrate items
       const rawItems = o.items || o.order_items || [];
       const hydrated = await hydrateItems(rawItems, signal);
       setOrder((prev) => ({ ...prev, items: hydrated }));
+
+      // lấy canReview
+      await refreshCanReview(hydrated, signal);
     } catch (e) {
       if (e.name !== "AbortError") {
         console.error(e);
@@ -307,38 +341,58 @@ export default function OrderTracking() {
     }
   };
 
-  const reorder = () => {
-    if (!order) return;
-    const src = (order.items || order.order_items || []);
-    if (!src.length) return;
-    const load = () => {
-      try { return JSON.parse(localStorage.getItem("cart") || "[]"); } catch { return []; }
-    };
-    const save = (v) => localStorage.setItem("cart", JSON.stringify(v));
+  // ====== MUA LẠI: thêm tất cả items vào giỏ & cộng dồn số lượng ======
+// ====== MUA LẠI: thêm tất cả items vào giỏ (không cần F5) ======
+const reorder = () => {
+  if (!order) return;
+  const src = (order.items || order.order_items || []);
+  if (!src.length) {
+    alert("Đơn hàng không có sản phẩm.");
+    return;
+  }
 
-    const current = load();
-    const merged = [...current];
-    for (const it of src) {
-      const id = it.product_id || it.product?.id || it.id;
-      if (!id) continue;
-      const name  = it.name || it.product?.name || `#${id}`;
-      const qty   = it.qty ?? it.quantity ?? 1;
-      const price = Number(it.price ?? it.product?.price_sale ?? it.product?.price_root ?? it.product?.price ?? 0);
-      const thumb = it.thumbnail_url || it.product_image || it.image_url || it.thumbnail || PLACEHOLDER;
+  // Chuẩn hoá danh sách items cần thêm vào giỏ
+  const itemsToAdd = [];
+  for (const it of src) {
+    const id = it.product_id || it.product?.id || it.id;
+    if (!id) continue;
 
-      const existIdx = merged.findIndex((x) => x.id === id);
-      if (existIdx >= 0) merged[existIdx].qty += qty;
-      else merged.push({ id, name, price, qty, thumbnail_url: thumb });
-    }
-    save(merged);
-    alert("🛒 Đã thêm lại các sản phẩm vào giỏ!");
-    navigate("/cart");
-  };
+    const name  = it.name || it.product?.name || `#${id}`;
+    const qty   = Number(it.qty ?? it.quantity ?? 1);
+    const price = Number(
+      it.price ??
+      it.product?.price_sale ??
+      it.product?.price_root ??
+      it.product?.price ??
+      0
+    );
+    const thumb = it.thumbnail_url || it.product_image || it.image_url || it.thumbnail || PLACEHOLDER;
 
+    // cấu trúc tương thích với Cart
+    itemsToAdd.push({ id, name, price, qty, thumbnail_url: thumb });
+  }
+
+  // Phát sự kiện để App cập nhật state cart ngay lập tức
+  window.dispatchEvent(new CustomEvent("cart:merge", { detail: itemsToAdd }));
+
+  alert("🛒 Đã thêm lại các sản phẩm vào giỏ!");
+  // SPA navigate: không reload, vẫn thấy giỏ cập nhật ngay
+  navigate("/cart");
+};
+
+  // ===================================================================
+
+  // mở form đánh giá với sản phẩm đầu tiên còn được review
   const reviewFirst = () => {
-    const it = (order?.items || order?.order_items || [])[0];
-    const pid = it?.product_id || it?.product?.id || it?.id;
-    if (pid) navigate(`/products/${pid}`);
+    const items = order?.items || order?.order_items || [];
+    const first = items.find((it) => {
+      const pid = it.product_id || it.product?.id || it.id;
+      return pid && canReviewMap[pid];
+    });
+    if (first) {
+      const pid = first.product_id || first.product?.id || first.id;
+      navigate(`/products/${pid}?review=1`);
+    }
   };
 
   return (
@@ -400,7 +454,9 @@ export default function OrderTracking() {
               {statusKey === "delivered" && (
                 <>
                   <button className="btn-ghost" onClick={reorder}>Mua lại</button>
-                  <button className="btn-ghost" onClick={reviewFirst}>Đánh giá</button>
+                  {Object.values(canReviewMap).some(Boolean) && (
+                    <button className="btn-ghost" onClick={reviewFirst}>Đánh giá</button>
+                  )}
                 </>
               )}
             </div>
@@ -451,7 +507,7 @@ export default function OrderTracking() {
             ))}
           </div>
 
-          {/* Thông tin giao hàng + tiền */}
+          {/* Thông tin + tiền */}
           <div className="grid-two">
             <div className="panel">
               <h4>📍 Thông tin giao hàng</h4>
@@ -479,33 +535,52 @@ export default function OrderTracking() {
           <div className="panel">
             <h4>🧺 Sản phẩm</h4>
             <div className="items">
-              {(order.items || order.order_items || []).map((it) => (
-                <div
-                  key={it.id || `${it.product_id}-${it.variant_id || ""}`}
-                  className="item"
-                >
-                  <img
-                    src={
-                      it.thumbnail_url
-                      || it.product_image
-                      || it.image_url
-                      || it.thumbnail
-                      || PLACEHOLDER
-                    }
-                    alt={it.name}
-                    onError={(e) => (e.currentTarget.src = PLACEHOLDER)}
-                  />
-                  <div className="item-info">
-                    <div className="item-name">{it.name}</div>
-                    <div className="item-sub">
-                      SL: {it.qty ?? it.quantity ?? 0} × ₫{fmt(it.price)}
+              {(order.items || order.order_items || []).map((it) => {
+                const pid = it?.product_id || it?.productId || it?.product?.id || it?.id;
+                const showReviewBtn = statusKey === "delivered" && canReviewMap[pid];
+
+                return (
+                  <div
+                    key={it.id || `${it.product_id}-${it.variant_id || ""}`}
+                    className="item"
+                  >
+                    <img
+                      src={
+                        it.thumbnail_url
+                        || it.product_image
+                        || it.image_url
+                        || it.thumbnail
+                        || PLACEHOLDER
+                      }
+                      alt={it.name}
+                      onError={(e) => (e.currentTarget.src = PLACEHOLDER)}
+                    />
+                    <div className="item-info">
+                      <div className="item-name">{it.name}</div>
+                      <div className="item-sub">
+                        SL: {it.qty ?? it.quantity ?? 0} × ₫{fmt(it.price)}
+                      </div>
                     </div>
+                    <div className="item-total">
+                      ₫{fmt((it.qty || it.quantity || 0) * (it.price || 0))}
+                    </div>
+
+                    {showReviewBtn && (
+                      <div>
+                        <button
+                          className="btn-ghost"
+                          onClick={() => {
+                            if (pid) navigate(`/products/${pid}?review=1`);
+                            else alert("Không tìm được product_id để mở form đánh giá.");
+                          }}
+                        >
+                          Đánh giá
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="item-total">
-                    ₫{fmt((it.qty || it.quantity || 0) * (it.price || 0))}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {(!order.items || (order.items || order.order_items || []).length === 0) && (
                 <div className="muted">Không có sản phẩm.</div>
               )}
@@ -575,13 +650,13 @@ export default function OrderTracking() {
         .meta-chip.muted { background:#f8fafc; border-color:#e2e8f0; color:#334155; }
         .order-actions { display:flex; gap:8px; justify-self:end; }
         .btn-ghost{
-          padding:8px 12px; border-radius:10px; border:1px solid #dfe7ec; background:#fff; cursor:pointer; font-weight:700;
+          padding:8px 12px; border-radius:10px; border:1px solid #dfe7ec; background:#fff; color:#111827; cursor:pointer; font-weight:700;
           transition: transform .2s var(--e), box-shadow .2s var(--e);
         }
         .btn-ghost:hover{ transform: translateY(-1px); box-shadow:0 8px 18px rgba(0,0,0,.06); }
-        .btn-ghost.danger{ border-color:#fecaca; color:#b91c1c; background:#fff5f5; }
+        .btn-ghost.danger{ border-color:#fecaca; color:#111827; background:#fff5f5; }
         .copy-btn{
-          margin-left:10px; font-size:12px; border:1px solid #e6eef6; background:#fff; border-radius:8px; padding:4px 8px; cursor:pointer;
+          margin-left:10px; font-size:12px; border:1px solid #e6eef6; background:#fff; color:#111827; border-radius:8px; padding:4px 8px; cursor:pointer;
         }
         .btn-link{
           margin-left:8px; font-size:12px; padding:4px 8px; border-radius:8px; background:#f1f5ff; color:#1e3a8a; text-decoration:none;
@@ -621,7 +696,7 @@ export default function OrderTracking() {
         .trackline{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
         .code{ background:#f8fafc; padding:2px 6px; border-radius:6px; }
         .items{ display:flex; flex-direction:column; gap:10px; }
-        .item{ display:grid; grid-template-columns: 64px 1fr auto; align-items:center; gap:12px; padding:8px; border-radius:12px; border:1px solid #f1f5f9; }
+        .item{ display:grid; grid-template-columns: 64px 1fr auto auto; align-items:center; gap:12px; padding:8px; border-radius:12px; border:1px solid #f1f5f9; }
         .item img{ width:64px; height:48px; object-fit:cover; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,.06); }
         .item-name{ font-weight:800; }
         .item-sub{ font-size:13px; color:#6b7280; }

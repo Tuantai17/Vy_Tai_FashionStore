@@ -141,17 +141,19 @@ export default function Home() {
       }}
     >
       {/* ====== SEARCH BOX ====== */}
-      <section style={{ margin: "20px auto", maxWidth: 700, position: "relative" }}>
+      <section style={{ margin: "20px auto", maxWidth: 700, position: "relative"}}>
         <form onSubmit={handleSearch} style={{ display: "flex", gap: 8 }}>
           <input
             type="text"
             value={query}
             onChange={handleChange}
-            placeholder="🔍 Tìm kiếm sản phẩm..."
+            placeholder="Tìm kiếm"
+            onFocus={(e) => { e.target.placeholder = ""; }}        
+            onBlur={(e) => { e.target.placeholder = "Tìm kiếm"; }}
             style={{
               flex: 1,
               padding: "12px 16px",
-              borderRadius: 8,
+              borderRadius: 9999,
               border: "1px solid #ccc",
               fontSize: 16,
               outline: "none",
@@ -160,32 +162,39 @@ export default function Home() {
           />
           <button
             type="submit"
+            aria-label="Tìm kiếm"
+            title="Tìm kiếm"
             style={{
-              padding: "12px 20px",
-              borderRadius: 8,
-              border: "none",
-              background: "#388e3c",
-              color: "#fff",
-              cursor: "pointer",
-              fontWeight: 600,
+                width: 33,
+                height: 33,
+                borderRadius: "50%",
+                border: "1px solid #d1d5db",
+                display: "inline-block",
+                backgroundImage: "url('http://127.0.0.1:8000/assets/images/search.png')",
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+                marginRight: 10,
             }}
-          >
-            Tìm
-          </button>
+          />
+
           {searching && (
             <button
               type="button"
               onClick={goHome}
               style={{
-                padding: "12px 16px",
-                borderRadius: 8,
-                border: "1px solid #ccc",
-                background: "#fff",
-                cursor: "pointer",
-                fontWeight: 500,
+                  width: 33,
+                  height: 33,
+                  borderRadius: "50%",
+                  border: "1px solid #d1d5db",
+                  display: "inline-block",
+                  backgroundImage: "url('http://127.0.0.1:8000/assets/images/home.png')",
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                  marginRight: 10,
               }}
             >
-              🏠 Trang chủ
             </button>
           )}
         </form>

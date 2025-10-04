@@ -4,29 +4,51 @@ import { useParams, Link } from "react-router-dom";
 const API_BASE = "http://127.0.0.1:8000/api";
 const VND = new Intl.NumberFormat("vi-VN");
 
+// (giữ nguyên các hàm cũ để không ảnh hưởng nơi khác)
 const badgeTone = (status) => {
   const code = String(status).toLowerCase();
-  if (code.includes("complete") || code === "1") {
-    return "admin-pill admin-pill--success";
-  }
-  if (code.includes("cancel") || code === "2") {
-    return "admin-pill admin-pill--danger";
-  }
+  if (code.includes("complete") || code === "1") return "admin-pill admin-pill--success";
+  if (code.includes("cancel") || code === "2")   return "admin-pill admin-pill--danger";
   return "admin-pill admin-pill--warning";
 };
-
 const humanStatus = (s) => {
   if (typeof s === "string") return s;
   switch (Number(s)) {
-    case 0:
-      return "Pending";
-    case 1:
-      return "Completed";
-    case 2:
-      return "Cancelled";
-    default:
-      return "Unknown";
+    case 0: return "Pending";
+    case 1: return "Completed";
+    case 2: return "Cancelled";
+    default: return "Unknown";
   }
+};
+
+// ✅ Chuẩn hoá sang 5-key + canceled (không đổi UI)
+const normalizeStatusKey = (s) => {
+  const str = String(s ?? "").toLowerCase().trim();
+  const map = {
+    "0": "pending",
+    "1": "confirmed",
+    "2": "canceled",   // ← khi backend đánh dấu hủy (status=2)
+    "3": "shipping",
+    "4": "delivered",
+
+    pending: "pending",
+    confirmed: "confirmed",
+    ready: "ready",
+    shipping: "shipping",
+    shipped: "shipping",
+    delivered: "delivered",
+    canceled: "canceled",
+    cancelled: "canceled",
+  };
+  return map[str] || "pending";
+};
+const STATUS_LABEL = {
+  pending:   "Chờ xác nhận",
+  confirmed: "Đã xác nhận",
+  ready:     "Chờ vận chuyển",
+  shipping:  "Đang giao",
+  delivered: "Giao thành công",
+  canceled:  "Đã hủy",     // ← hiển thị khi bị hủy
 };
 
 export default function OrderDetail() {
@@ -52,17 +74,27 @@ export default function OrderDetail() {
         if (!ignore) setLoading(false);
       }
     })();
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, [id]);
 
   if (loading) return <div className="admin-form-card">Dang tai...</div>;
   if (err) return <p className="admin-form-error">{err}</p>;
   if (!order) return <p className="admin-form-error">Khong tim thay don hang.</p>;
 
+  // Lấy trạng thái (ưu tiên status_step/step_code)
+  const statusKey = normalizeStatusKey(order?.status_step ?? order?.step_code ?? order?.status);
+  const statusLabel = STATUS_LABEL[statusKey] || statusKey;
+  const badgeClass =
+    statusKey === "delivered" ? "admin-pill admin-pill--success"
+  : statusKey === "canceled"  ? "admin-pill admin-pill--danger"
+  : (statusKey === "shipping" || statusKey === "ready" || statusKey === "confirmed")
+    ? "admin-pill admin-pill--info"
+    : "admin-pill admin-pill--warning";
+
   const items = order.items || [];
-  const total = Number(order.total ?? items.reduce((s, i) => s + Number(i.price || 0) * Number(i.qty || 0), 0));
+  const total = Number(
+    order.total ?? items.reduce((s, i) => s + Number(i.price || 0) * Number(i.qty || 0), 0)
+  );
 
   return (
     <section className="admin-form-card admin-form-card--wide">
@@ -72,9 +104,7 @@ export default function OrderDetail() {
           <h1 className="admin-form-title">Don hang #{order.id}</h1>
           <p className="admin-form-subtitle">Chi tiet giao dich va danh sach san pham.</p>
         </div>
-        <Link to="/admin/orders" className="admin-link-button">
-          ← Quay lai
-        </Link>
+        <Link to="/admin/orders" className="admin-link-button">← Quay lai</Link>
       </div>
 
       <div className="admin-order-panels">
@@ -83,27 +113,12 @@ export default function OrderDetail() {
             <h2 className="admin-section-card__title">Thong tin khach hang</h2>
           </header>
           <div className="admin-section-card__body admin-order-info">
-            <div>
-              <span className="admin-order-info__label">Ten</span>
-              <span className="admin-order-info__value">{order.name}</span>
-            </div>
-            <div>
-              <span className="admin-order-info__label">Email</span>
-              <span className="admin-order-info__value">{order.email || "--"}</span>
-            </div>
-            <div>
-              <span className="admin-order-info__label">SDT</span>
-              <span className="admin-order-info__value">{order.phone || "--"}</span>
-            </div>
-            <div>
-              <span className="admin-order-info__label">Dia chi</span>
-              <span className="admin-order-info__value">{order.address || "--"}</span>
-            </div>
+            <div><span className="admin-order-info__label">Ten</span><span className="admin-order-info__value">{order.name}</span></div>
+            <div><span className="admin-order-info__label">Email</span><span className="admin-order-info__value">{order.email || "--"}</span></div>
+            <div><span className="admin-order-info__label">SDT</span><span className="admin-order-info__value">{order.phone || "--"}</span></div>
+            <div><span className="admin-order-info__label">Dia chi</span><span className="admin-order-info__value">{order.address || "--"}</span></div>
             {order.note && (
-              <div>
-                <span className="admin-order-info__label">Ghi chu</span>
-                <span className="admin-order-info__value">{order.note}</span>
-              </div>
+              <div><span className="admin-order-info__label">Ghi chu</span><span className="admin-order-info__value">{order.note}</span></div>
             )}
           </div>
         </article>
@@ -113,7 +128,8 @@ export default function OrderDetail() {
             <h2 className="admin-section-card__title">Trang thai</h2>
           </header>
           <div className="admin-section-card__body admin-order-status">
-            <span className={badgeTone(order.status)}>{humanStatus(order.status)}</span>
+            <span className={badgeClass}>{statusLabel}</span>
+
             <div>
               <span className="admin-order-info__label">Tao luc</span>
               <span className="admin-order-info__value">
@@ -186,7 +202,9 @@ export default function OrderDetail() {
                 })}
                 {items.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center text-muted">Khong co san pham trong don hang.</td>
+                    <td colSpan={6} className="text-center text-muted">
+                      Khong co san pham trong don hang.
+                    </td>
                   </tr>
                 )}
               </tbody>

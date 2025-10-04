@@ -10,13 +10,20 @@ use App\Http\Controllers\Api\{
     BrandController,
     AuthController,
     OrderController,
-    UserController
+    UserController,
+    ReviewController
 };
-
 // ===== Auth =====
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login',    [AuthController::class, 'login']);
 Route::post('/logout',   [AuthController::class, 'logout'])->middleware('auth:sanctum');
+
+// ===== Reviews (⚠️ phải đặt trước /products/{id}) =====
+Route::get('/products/{id}/reviews', [ReviewController::class, 'index']);
+Route::get('/products/{id}/can-review', [ReviewController::class, 'canReview'])->middleware('auth:sanctum');
+Route::post('/products/{id}/reviews', [ReviewController::class, 'store'])->middleware('auth:sanctum');
+Route::put('/reviews/{id}', [ReviewController::class, 'update'])->middleware('auth:sanctum');
+Route::delete('/reviews/{id}', [ReviewController::class, 'destroy'])->middleware('auth:sanctum');
 
 // ===== Products =====
 Route::get('/products',      [ProductController::class, 'index']);
@@ -38,6 +45,10 @@ Route::get('/brands', [BrandController::class, 'index']);
 Route::get('/orders',        [OrderController::class, 'index']);
 Route::get('/orders/track',  [OrderController::class, 'track']);
 Route::get('/orders/{order}',[OrderController::class, 'show'])->whereNumber('order');
+
+Route::post('/orders/{order}/cancel', [OrderController::class, 'cancelById']);
+Route::post('/orders/cancel',        [OrderController::class, 'cancel']);
+
 
 // Cập nhật tiến trình (ghi status_step/step_code) — KHÔNG trùng lặp
 Route::match(['put','patch'], '/orders/{order}',        [OrderController::class, 'updateStatusStep'])->whereNumber('order');
