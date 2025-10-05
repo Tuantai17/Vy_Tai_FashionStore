@@ -6,6 +6,10 @@ import Products from "./pages/Customers/Products";
 import ProductDetail from "./pages/Customers/ProductDetail";
 import Cart from "./pages/Customers/Cart";
 
+
+import PaymentResult from "./pages/Customers/PaymentResult";
+
+
 function App() {
   return (
     <BrowserRouter>
@@ -23,6 +27,11 @@ function App() {
 
         {/* Giỏ hàng */}
         <Route path="/cart" element={<Cart />} />
+
+
+  <Route path="/momo/return" element={<PaymentResult />} />
+
+
       </Routes>
     </BrowserRouter>
   );

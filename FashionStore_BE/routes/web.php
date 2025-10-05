@@ -5,6 +5,15 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\AuthController;
 
+
+
+
+
+use App\Http\Controllers\Api\MomoController;
+
+
+Route::get('/momo/return', [MomoController::class, 'return'])->name('momo.return');
+
 // ===== Auth =====
 
 

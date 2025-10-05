@@ -244,18 +244,18 @@ export default function Checkout({ setCart }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ nhận dữ liệu cart từ Cart.jsx
   const cart = location.state?.cart || [];
 
   const [form, setForm] = useState({
     customer_name: "",
     phone: "",
-    email: "",       // ✅ thêm email
+    email: "",
     address: "",
     payment_method: "COD",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [momoType, setMomoType] = useState("captureWallet"); // ✅ Thêm loại momo: captureWallet = ví, payWithATM = ATM
 
   const total = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
 
@@ -264,6 +264,44 @@ export default function Checkout({ setCart }) {
     setForm((s) => ({ ...s, [name]: value }));
   };
 
+  // ✅ Thanh toán bằng MoMo
+  const handlePayWithMomo = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const amount = Math.max(1000, Math.round(Number(total) || 0));
+
+      // 🔑 Backend route đúng của bạn là /api/momo/create
+      const res = await fetch(`${API_BASE}/api/momo/create`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+       body: JSON.stringify({
+  amount: Number(amount), // ✅ đảm bảo kiểu số
+  method: momoType === "payWithATM" ? "payWithATM" : "momo_wallet",
+}),
+
+      });
+
+      const j = await res.json();
+
+      if (j?.payUrl) {
+        window.location.href = j.payUrl; // ✅ Redirect sang trang MoMo
+      } else {
+        setError(j?.message || "Không khởi tạo được thanh toán MoMo.");
+      }
+    } catch (e) {
+      console.error(e);
+      setError("Không thể kết nối MoMo.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Gửi đơn hàng (COD / không qua MoMo)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -279,14 +317,13 @@ export default function Checkout({ setCart }) {
         },
         body: JSON.stringify({
           ...form,
-          items: cart, // ✅ gửi giỏ hàng nhận được từ Cart.jsx
+          items: cart,
         }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        // 🔑 Lấy mã đơn theo nhiều khả năng trả về của API
         const orderCode =
           data?.code ||
           data?.order_code ||
@@ -294,13 +331,9 @@ export default function Checkout({ setCart }) {
           data?.order_id ||
           data?.id;
 
-        // (tuỳ bạn muốn giữ alert hay không)
         alert("✅ Đặt hàng thành công!" + (orderCode ? " Mã đơn: " + orderCode : ""));
-
-        // Lưu để tự điền ở trang /track lần sau
         if (orderCode) localStorage.setItem("last_order_code", String(orderCode));
 
-        // Xoá giỏ & điều hướng sang trang Theo dõi
         setCart([]);
         if (orderCode) {
           navigate(`/track?code=${encodeURIComponent(orderCode)}`, { replace: true });
@@ -321,7 +354,6 @@ export default function Checkout({ setCart }) {
     <div style={{ maxWidth: 800, margin: "30px auto", padding: 20 }}>
       <h2 style={{ marginBottom: 20, color: "#388e3c" }}>🧾 Thanh toán</h2>
 
-      {/* nếu giỏ hàng trống */}
       {cart.length === 0 ? (
         <p>⚠️ Giỏ hàng của bạn đang trống, vui lòng quay lại chọn sản phẩm.</p>
       ) : (
@@ -337,7 +369,7 @@ export default function Checkout({ setCart }) {
               }}
             >
               {error}
-</p>
+            </p>
           )}
 
           <div
@@ -382,7 +414,6 @@ export default function Checkout({ setCart }) {
                 />
               </div>
 
-              {/* ✅ Thêm Email */}
               <div style={{ marginBottom: 12 }}>
                 <label>Email</label>
                 <input
@@ -416,9 +447,72 @@ export default function Checkout({ setCart }) {
                   style={{ width: "100%", padding: 10 }}
                 >
                   <option value="COD">Thanh toán khi nhận hàng</option>
-                  <option value="Bank">Chuyển khoản ngân hàng</option>
+                  <option value="Bank">Chuyển khoản / Ví điện tử</option>
                 </select>
               </div>
+
+              {/* ✅ Khi chọn Bank thì hiển thị lựa chọn MoMo */}
+              {form.payment_method === "Bank" && (
+                <div
+                  style={{
+                    background: "#F6F9FF",
+                    border: "1px solid #E0E7FF",
+                    padding: 12,
+                    borderRadius: 10,
+                    marginBottom: 14,
+                  }}
+                >
+                  <div style={{ marginBottom: 8, fontWeight: 600 }}>
+                    Chọn phương thức MoMo
+                  </div>
+
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={{ display: "block", marginBottom: 6 }}>
+                      <input
+                        type="radio"
+                        name="momoType"
+                        value="captureWallet"
+                        checked={momoType === "captureWallet"}
+                        onChange={() => setMomoType("captureWallet")}
+                      />
+                      &nbsp; Ví MoMo (App / QR)
+                    </label>
+
+                    <label style={{ display: "block" }}>
+                      <input
+                        type="radio"
+                        name="momoType"
+                        value="payWithATM"
+                        checked={momoType === "payWithATM"}
+                        onChange={() => setMomoType("payWithATM")}
+                      />
+                      &nbsp; Thẻ nội địa (ATM Napas)
+                    </label>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handlePayWithMomo}
+                    disabled={loading}
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                      border: "none",
+                      background: "#A50064",
+                      color: "#fff",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {loading
+                      ? "⏳ Đang chuyển tới MoMo..."
+                      : momoType === "captureWallet"
+                      ? "Thanh toán bằng Ví MoMo"
+                      : "Thanh toán bằng Thẻ ATM (Napas)"}
+                  </button>
+                </div>
+              )}
 
               <button
                 type="submit"
@@ -429,7 +523,7 @@ export default function Checkout({ setCart }) {
                   background: "#388e3c",
                   color: "#fff",
                   fontWeight: 600,
-fontSize: 16,
+                  fontSize: 16,
                   border: "none",
                   borderRadius: 10,
                   cursor: "pointer",
@@ -439,7 +533,7 @@ fontSize: 16,
               </button>
             </form>
 
-            {/* Thông tin giỏ hàng */}
+            {/* Giỏ hàng */}
             <div
               style={{
                 background: "#fff",
