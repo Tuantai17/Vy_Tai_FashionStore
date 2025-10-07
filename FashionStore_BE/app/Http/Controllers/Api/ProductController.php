@@ -109,14 +109,23 @@ class ProductController extends Controller
     }
 
     // ====================== ADMIN LIST ======================
-    public function adminIndex()
+    public function adminIndex(Request $request)
     {
-        $products = Product::with('brand:id,name')
+        $query = Product::with('brand:id,name')
             ->select(['id', 'name', 'slug', 'brand_id', 'price_root', 'price_sale', 'qty', 'thumbnail', 'status'])
-            ->latest('id')
-            ->paginate(10);
+            ->latest('id');
 
-        return $products->makeHidden(['brand', 'brand_id']);
+        $perPage = (int) $request->query('per_page', 10);
+
+        if ($request->boolean('all') || $perPage === -1) {
+            return $query->get()->makeHidden(['brand', 'brand_id']);
+        }
+
+        if ($perPage <= 0) {
+            $perPage = 10;
+        }
+
+        return $query->paginate($perPage)->makeHidden(['brand', 'brand_id']);
     }
 
     // ====================== CREATE ======================

@@ -384,9 +384,9 @@ export default function Home() {
                 </div>
 
                 {/* Con */}
-                <h3 style={{ fontSize: 22, fontWeight: 600, margin: "20px 0", color: "#9c27b0" }}>
+                {/* <h3 style={{ fontSize: 22, fontWeight: 600, margin: "20px 0", color: "#9c27b0" }}>
                   Danh mục phụ
-                </h3>
+                </h3> */}
                 <div
                   style={{
                     display: "flex",
@@ -492,31 +492,55 @@ export default function Home() {
             </>
           )}
 
-          {/* About */}
-          <section
-            style={{
-              background: "#fff",
-              borderRadius: 16,
-              boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-              padding: "40px 28px",
-              margin: "60px auto",
-              maxWidth: 800,
-              textAlign: "center",
-            }}
-          >
-            <h2 style={{ fontSize: 26, fontWeight: 600, marginBottom: 16, color: "#111" }}>
-              Về Fashion Store
-            </h2>
-            <p style={{ color: "#444", fontSize: 17, lineHeight: 1.7 }}>
-              <strong>Fashion Store</strong> là điểm đến lý tưởng cho những ai yêu thích phong cách
-              và sự khác biệt. Chúng tôi mang đến các bộ sưu tập thời trang từ thường
-              ngày đến cao cấp, giúp bạn tự tin thể hiện cá tính riêng.
-              <br />
-              <br />
-              Với chất lượng sản phẩm cao cấp, dịch vụ chuyên nghiệp và xu hướng cập nhật liên tục,
-              Fashion Store cam kết mang lại trải nghiệm mua sắm sang trọng và đẳng cấp.
-            </p>
-          </section>
+{/* About Section */}
+<section className="py-16 px-4 bg-gradient-to-b from-gray-50 to-white dark:from-neutral-950 dark:to-neutral-900">
+  <div
+    className="
+      relative max-w-4xl mx-auto text-center 
+      rounded-2xl bg-white/80 dark:bg-neutral-900/80
+      shadow-[0_8px_35px_rgba(0,0,0,0.08)]
+      ring-1 ring-gray-100 dark:ring-neutral-800
+      px-8 py-12
+      backdrop-blur-sm
+    "
+  >
+    {/* Thanh gradient nhỏ trang trí trên đầu */}
+    <div className="absolute inset-x-10 -top-2 h-1 rounded-full bg-gradient-to-r from-pink-500 via-fuchsia-500 to-indigo-500"></div>
+
+    {/* Tiêu đề */}
+    <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-6">
+      Về{" "}
+      <span className="bg-gradient-to-r from-pink-500 to-indigo-500 bg-clip-text text-transparent">
+        Fashion Store
+      </span>
+    </h2>
+
+    {/* Nội dung */}
+    <p className="text-lg leading-8 text-gray-600 dark:text-neutral-300">
+      <strong className="text-gray-900 dark:text-white">Fashion Store</strong> là điểm đến lý tưởng cho
+      những ai yêu thích phong cách và sự khác biệt. Chúng tôi mang đến các bộ sưu tập thời trang
+      từ thường ngày đến cao cấp, giúp bạn tự tin thể hiện cá tính riêng.
+    </p>
+    <p className="mt-4 text-lg leading-8 text-gray-600 dark:text-neutral-300">
+      Với chất lượng sản phẩm cao cấp, dịch vụ chuyên nghiệp và xu hướng cập nhật liên tục, Fashion
+      Store cam kết mang lại trải nghiệm mua sắm sang trọng và đẳng cấp.
+    </p>
+
+    {/* Dòng tag nhỏ phía dưới */}
+    <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-sm font-medium">
+      <span className="px-4 py-1.5 rounded-full bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-gray-300">
+        Bộ sưu tập mới mỗi tuần
+      </span>
+      <span className="px-4 py-1.5 rounded-full bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-gray-300">
+        Đổi trả 7 ngày
+      </span>
+      <span className="px-4 py-1.5 rounded-full bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-gray-300">
+        Hỗ trợ 24/7
+      </span>
+    </div>
+  </div>
+</section>
+
         </>
       )}
     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate, useLocation  } from "react-router-dom";
 import "./index.css";
@@ -36,7 +36,7 @@ import AddCategory from "./pages/Admin/Category/AddCategory";
 import EditCategory from "./pages/Admin/Category/EditCategory.jsx";
 
 
-
+import Settings from "./pages/Admin/Settings/Settings.jsx";
 
 
 
@@ -478,6 +478,9 @@ function App() {
           <Route path="orders" element={<AdminOrders />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="categories/add" element={<AddCategory />} />
+
+
+          <Route path="settings" element={<Settings />} />
         </Route>
 
         <Route path="*" element={<Layout><div>Không tìm thấy trang</div></Layout>} />

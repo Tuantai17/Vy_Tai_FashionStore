@@ -1,0 +1,65 @@
+*** Begin Patch
+*** Update File: FashionStore_FE/vite-project/src/main.jsx
+@@
+-      <footer className="px-4 py-3 border-t text-sm text-gray-600">
+-        Ac {new Date().getFullYear()} StoreVegetables
+-      </footer>
+-
+-      {/* ? Nháy icon gi? khi thêm hàng */}
++      <footer className="bg-neutral-900 text-neutral-100">
++        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-8 md:grid-cols-3">
++          <div className="space-y-3">
++            <h3 className="text-lg font-semibold tracking-wide uppercase">Ve FashionStore</h3>
++            <p className="text-sm leading-6 text-neutral-300">FashionStore mang den nhung thiet ke moi nhat, giup ban tu tin tao phong cach rieng cua minh moi ngay.</p>
++            <div className="text-sm text-neutral-400 space-y-1">
++              <p>CONG TY TNHH FASHIONSTORE</p>
++              <p>MST: 0315986019 - Cap ngay 12/03/2022 tai So KH&amp;DT TP.HCM</p>
++              <p className="inline-flex items-center justify-center rounded border border-neutral-500 px-2 py-1 text-xs uppercase tracking-wide">Da dang ky Bo Cong Thuong</p>
++            </div>
++          </div>
++
++          <div className="space-y-3">
++            <h3 className="text-lg font-semibold tracking-wide uppercase">Ho tro khach hang</h3>
++            <ul className="text-sm text-neutral-300 space-y-2">
++              <li><a className="hover:text-white" href="/about">Gioi thieu FashionStore</a></li>
++              <li><a className="hover:text-white" href="/me/orders">Kiem tra don hang</a></li>
++              <li><a className="hover:text-white" href="/contact">He thong cua hang</a></li>
++              <li><a className="hover:text-white" href="/policy/shipping">Huong dan dat hang</a></li>
++              <li><a className="hover:text-white" href="/policy/terms">Chinh sach va quy dinh</a></li>
++              <li><a className="hover:text-white" href="/policy/privacy">Chinh sach bao mat</a></li>
++            </ul>
++          </div>
++
++          <div className="space-y-3">
++            <h3 className="text-lg font-semibold tracking-wide uppercase">Cham soc khach hang</h3>
++            <div className="space-y-1 text-sm text-neutral-300">
++              <p className="text-xl font-semibold text-white">
++                <a className="hover:underline" href="tel:0836311117">0836 311 117</a> -
++                <a className="hover:underline" href="tel:0775913335"> 0775 913 335</a>
++              </p>
++              <p>
++                <a className="hover:underline" href="mailto:care@fashionstore.vn">care@fashionstore.vn</a>
++              </p>
++            </div>
++            <div className="space-y-2">
++              <h4 className="text-sm font-semibold uppercase tracking-wide text-neutral-200">Follow us</h4>
++              <div className="flex items-center gap-2 text-xs">
++                <a className="inline-flex h-8 w-8 items-center justify-center rounded border border-neutral-500 hover:border-white hover:text-white transition" href="#">FB</a>
++                <a className="inline-flex h-8 w-8 items-center justify-center rounded border border-neutral-500 hover:border-white hover:text-white transition" href="#">IG</a>
++                <a className="inline-flex h-8 w-8 items-center justify-center rounded border border-neutral-500 hover:border-white hover:text-white transition" href="#">TT</a>
++                <a className="inline-flex h-8 w-8 items-center justify-center rounded border border-neutral-500 hover:border-white hover:text-white transition" href="#">YT</a>
++              </div>
++              <div className="text-xs text-neutral-400">Dia chi: 69 Duong D10, Tay Thanh, Quan Tan Phu, TP.HCM</div>
++            </div>
++          </div>
++        </div>
++
++        <div className="border-t border-neutral-800 bg-neutral-950 py-4">
++          <div className="max-w-6xl mx-auto px-4 sm:px-6 text-xs text-neutral-500 text-center">
++            Copyright © {new Date().getFullYear()} FashionStore Vietnam. Powered by FashionStore.
++          </div>
++        </div>
++      </footer>
++
++      {/* ? Nháy icon gi? khi thêm hàng */}
+*** End Patch
