@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
@@ -86,6 +86,10 @@ Route::delete('/reviews/{id}', [ReviewController::class, 'destroy'])->middleware
 Route::get('/products',      [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/categories/{id}/products', [ProductController::class, 'byCategory'])->whereNumber('id');
+
+Route::get('/admin/products/trash', [ProductController::class, 'trash']);
+Route::post('/admin/products/{id}/restore', [ProductController::class, 'restore']);
+Route::post('/admin/products/{id}/force-delete', [ProductController::class, 'forceDestroy']);
 
 // ===== Categories (CRUD) =====
 Route::get('/categories',          [CategoryController::class, 'index']);

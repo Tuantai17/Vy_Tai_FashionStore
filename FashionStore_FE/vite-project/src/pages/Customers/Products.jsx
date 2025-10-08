@@ -5,9 +5,10 @@ import ProductCard from "../../components/ProductCard";
 
 const API_BASE = "http://127.0.0.1:8000";
 const API = {
-  categories: `${API_BASE}/api/categories`,
-  products: `${API_BASE}/api/products`,
-  catProducts: (id) => `${API_BASE}/api/categories/${id}/products`,
+  // thêm ?per_page=-1 để lấy full
+  categories: `${API_BASE}/api/categories?per_page=-1`,
+  products: `${API_BASE}/api/products?per_page=-1`,
+  catProducts: (id) => `${API_BASE}/api/categories/${id}/products?per_page=-1`,
 };
 const PLACEHOLDER = "https://placehold.co/300x200?text=No+Image";
 
@@ -32,6 +33,7 @@ export default function Products({ addToCart }) {
   const priceOf = (p) =>
     Number(p?.price ?? p?.price_sale ?? p?.sale_price ?? p?.regular_price ?? p?.amount ?? 0);
 
+  // ====== Tải FULL danh mục + FULL sản phẩm (không phân trang) ======
   useEffect(() => {
     const ac = new AbortController();
     (async () => {
@@ -61,6 +63,7 @@ export default function Products({ addToCart }) {
     return () => ac.abort();
   }, []);
 
+  // ====== Lấy tất cả id con của 1 danh mục (nếu có cấu trúc cây) ======
   const getDescendantIds = (id) => {
     const want = String(id);
     const out = [];
@@ -75,6 +78,7 @@ export default function Products({ addToCart }) {
     return out;
   };
 
+  // ====== Lấy FULL sản phẩm của 1 danh mục (dùng cache để tiết kiệm request) ======
   const fetchProductsOfCategory = async (cateId) => {
     const key = Number(cateId);
     if (catCache.current[key]) return catCache.current[key];
@@ -85,6 +89,7 @@ export default function Products({ addToCart }) {
     return list;
   };
 
+  // ====== Áp filter danh mục + khoảng giá (client-side) ======
   useEffect(() => {
     let cancelled = false;
 
@@ -98,7 +103,7 @@ export default function Products({ addToCart }) {
     const run = async () => {
       try {
         if (category === "" || category === null || isNaN(Number(category))) {
-          setFiltered(applyPrice(items));
+          if (!cancelled) setFiltered(applyPrice(items));
           return;
         }
 
@@ -145,14 +150,13 @@ export default function Products({ addToCart }) {
   }
 
   return (
-      <div 
+    <div 
       style={{ 
-        padding: "20px 16px",   // padding trong nhỏ
-        maxWidth: 1400,         // tăng chiều rộng để giảm khoảng trắng
-        margin: "0 auto"        // vẫn căn giữa
+        padding: "20px 16px",
+        maxWidth: 1400,
+        margin: "0 auto"
       }}
-      >
-
+    >
       <h2 style={{ marginBottom: 16, color: "#388e3c", textAlign: "center" }}>
         🌿 Tất cả sản phẩm
       </h2>
@@ -300,7 +304,6 @@ export default function Products({ addToCart }) {
                   image:
                     p.image_url || p.thumbnail_url || p.thumbnail || p.image || PLACEHOLDER,
                 }}
-                
               />
             </div>
           ))

@@ -149,9 +149,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends Model
 {
+    use SoftDeletes;
     protected $table = 'nqtv_product';
     protected $primaryKey = 'id';
     public $timestamps = true;
