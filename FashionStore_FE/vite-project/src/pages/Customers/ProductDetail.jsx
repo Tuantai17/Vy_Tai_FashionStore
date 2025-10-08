@@ -235,6 +235,19 @@ export default function ProductDetail({ addToCart }) {
             {price > 0 ? `${VND.format(price)}đ` : "Liên hệ"}
           </div>
 
+          {/* Hiển thị số lượng tồn kho */}
+          <div style={{ 
+  fontSize: 14, 
+  color: "#666", 
+  marginBottom: 16,
+  padding: "8px 12px",
+  background: "#f5f5f5",
+  borderRadius: 4,
+  display: "inline-block"
+}}>
+  <span style={{ fontWeight: 500 }}>Tồn kho:</span> {product.qty ?? 0} sản phẩm
+</div>
+
           {/* Chọn số lượng */}
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: "block", fontSize: 14, color: "#666", marginBottom: 8 }}>

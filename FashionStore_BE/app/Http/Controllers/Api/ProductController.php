@@ -76,23 +76,23 @@ class ProductController extends Controller
     // }
 
     public function index(Request $request)
-{
-    $query = Product::with('brand:id,name')
-        ->select(['id', 'name', 'brand_id', 'price_sale as price', 'thumbnail'])
-        ->latest('id');
+    {
+        $query = Product::with('brand:id,name')
+            ->select(['id', 'name', 'brand_id', 'price_sale as price', 'thumbnail'])
+            ->latest('id');
 
-    // NEW: cho phép lấy tất cả
-    $perPage = (int) $request->query('per_page', 12);
-    $all     = $request->boolean('all') || $perPage === -1;
+        // NEW: cho phép lấy tất cả
+        $perPage = (int) $request->query('per_page', 12);
+        $all     = $request->boolean('all') || $perPage === -1;
 
-    if ($all) {
-        // trả full list
-        return $query->get()->makeHidden(['brand', 'brand_id']);
+        if ($all) {
+            // trả full list
+            return $query->get()->makeHidden(['brand', 'brand_id']);
+        }
+
+        $perPage = $perPage > 0 ? $perPage : 12;
+        return $query->paginate($perPage)->makeHidden(['brand', 'brand_id']);
     }
-
-    $perPage = $perPage > 0 ? $perPage : 12;
-    return $query->paginate($perPage)->makeHidden(['brand', 'brand_id']);
-}
 
     public function show($id)
     {
@@ -106,6 +106,8 @@ class ProductController extends Controller
                 'detail',
                 'description',
                 'category_id',
+                'qty',  // Add this field
+                'status'
             ])
             ->find($id);
 
@@ -128,28 +130,28 @@ class ProductController extends Controller
     }
 
     // ====================== ADMIN LIST ======================
-   public function adminIndex(Request $request)
-{
-    $query = Product::with('brand:id,name')
-        ->select(['id','name','slug','brand_id','price_root','price_sale','qty','thumbnail','status'])
-        ->latest('id');
+    public function adminIndex(Request $request)
+    {
+        $query = Product::with('brand:id,name')
+            ->select(['id', 'name', 'slug', 'brand_id', 'price_root', 'price_sale', 'qty', 'thumbnail', 'status'])
+            ->latest('id');
 
-    $perPage = (int) $request->query('per_page', 10);
-    if ($request->boolean('all') || $perPage === -1) {
-        // Trả full list (không phân trang) khi yêu cầu all
-        $items = $query->get();
-        $items->transform(fn($m) => $m->makeHidden(['brand','brand_id']));
-        return response()->json($items);
+        $perPage = (int) $request->query('per_page', 10);
+        if ($request->boolean('all') || $perPage === -1) {
+            // Trả full list (không phân trang) khi yêu cầu all
+            $items = $query->get();
+            $items->transform(fn($m) => $m->makeHidden(['brand', 'brand_id']));
+            return response()->json($items);
+        }
+        if ($perPage <= 0) $perPage = 10;
+
+        // ⬇️ Quan trọng: paginate + transform collection bên trong
+        $paginator = $query->paginate($perPage);
+        $paginator->getCollection()->transform(fn($m) => $m->makeHidden(['brand', 'brand_id']));
+
+        // Trả paginator để FE đọc được current_page, last_page, total...
+        return response()->json($paginator);
     }
-    if ($perPage <= 0) $perPage = 10;
-
-    // ⬇️ Quan trọng: paginate + transform collection bên trong
-    $paginator = $query->paginate($perPage);
-    $paginator->getCollection()->transform(fn($m) => $m->makeHidden(['brand','brand_id']));
-
-    // Trả paginator để FE đọc được current_page, last_page, total...
-    return response()->json($paginator);
-}
 
 
     // ====================== CREATE ======================
@@ -274,59 +276,58 @@ class ProductController extends Controller
         //     Storage::disk('public')->delete($p->thumbnail);
         // }
 
-        
 
-         $p->delete(); // => soft delete
+
+        $p->delete(); // => soft delete
         return response()->json(['message' => 'Soft deleted']);
     }
 
     // ============ LIST TRASH ============
-public function trash(Request $request)
-{
-    $perPage = (int) $request->query('per_page', 12);
-    if ($perPage <= 0) $perPage = 12;
+    public function trash(Request $request)
+    {
+        $perPage = (int) $request->query('per_page', 12);
+        if ($perPage <= 0) $perPage = 12;
 
-    $q = trim((string) $request->query('q', ''));
+        $q = trim((string) $request->query('q', ''));
 
-    $query = Product::onlyTrashed()
-        ->select(['id','name','slug','brand_id','price_root','price_sale','qty','thumbnail','status'])
-        ->latest('deleted_at');
+        $query = Product::onlyTrashed()
+            ->select(['id', 'name', 'slug', 'brand_id', 'price_root', 'price_sale', 'qty', 'thumbnail', 'status'])
+            ->latest('deleted_at');
 
-    if ($q !== '') {
-        $query->where(function($sub) use ($q) {
-            $sub->where('name','like',"%{$q}%")
-                ->orWhere('slug','like',"%{$q}%");
-        });
+        if ($q !== '') {
+            $query->where(function ($sub) use ($q) {
+                $sub->where('name', 'like', "%{$q}%")
+                    ->orWhere('slug', 'like', "%{$q}%");
+            });
+        }
+
+        return $query->paginate($perPage)->appends($request->query());
     }
 
-    return $query->paginate($perPage)->appends($request->query());
-}
+    // ============ RESTORE ============
+    public function restore($id)
+    {
+        $p = Product::onlyTrashed()->find($id);
+        if (!$p) return response()->json(['message' => 'Not found'], 404);
 
-// ============ RESTORE ============
-public function restore($id)
-{
-    $p = Product::onlyTrashed()->find($id);
-    if (!$p) return response()->json(['message' => 'Not found'], 404);
-
-    $p->restore();
-    return response()->json(['message' => 'Restored']);
-}
-
-// ============ FORCE DELETE ============
-public function forceDestroy($id)
-{
-    $p = Product::onlyTrashed()->find($id);
-    if (!$p) return response()->json(['message' => 'Not found'], 404);
-
-    // Xóa file khi xóa vĩnh viễn
-    if ($p->thumbnail && Storage::disk('public')->exists($p->thumbnail)) {
-        Storage::disk('public')->delete($p->thumbnail);
+        $p->restore();
+        return response()->json(['message' => 'Restored']);
     }
 
-    $p->forceDelete();
-    return response()->json(['message' => 'Deleted forever']);
-}
+    // ============ FORCE DELETE ============
+    public function forceDestroy($id)
+    {
+        $p = Product::onlyTrashed()->find($id);
+        if (!$p) return response()->json(['message' => 'Not found'], 404);
 
+        // Xóa file khi xóa vĩnh viễn
+        if ($p->thumbnail && Storage::disk('public')->exists($p->thumbnail)) {
+            Storage::disk('public')->delete($p->thumbnail);
+        }
+
+        $p->forceDelete();
+        return response()->json(['message' => 'Deleted forever']);
+    }
 }
 
 
