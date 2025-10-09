@@ -1,12 +1,12 @@
-# PHP 8.2 + Composer
+# PHP 8.2 + Composer (CLI)
 FROM php:8.2-cli
 
-# Giúp composer chạy với root trong container
+# Cho composer chạy với user root trong container
 ENV COMPOSER_ALLOW_SUPERUSER=1
-# Timezone (tùy bạn, để VN)
+# Timezone (tùy chọn)
 ENV TZ=Asia/Ho_Chi_Minh
 
-# Cài package hệ thống và extension PHP cần cho Laravel + SQLite
+# Cài OS packages + PHP extensions cần cho Laravel + SQLite
 RUN apt-get update && apt-get install -y \
     git unzip curl tzdata \
     libzip-dev \
@@ -15,31 +15,28 @@ RUN apt-get update && apt-get install -y \
   && docker-php-ext-install pdo pdo_sqlite zip bcmath \
   && rm -rf /var/lib/apt/lists/*
 
-# Lấy Composer từ image chính thức (nhỏ, nhanh)
+# Lấy Composer từ image chính thức
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Thư mục làm việc
 WORKDIR /app
 
-# Tối ưu cache layer: copy trước composer files để composer install có cache
+# Tối ưu cache layer: cài vendor trước dựa vào composer.json/lock
 COPY composer.json composer.lock /app/
-
-# Cài vendor PHP (không dev) – tối ưu autoload cho prod
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
-# Copy phần còn lại của project
+# Copy toàn bộ mã nguồn còn lại
 COPY . /app
 
-# Đảm bảo script khởi động chạy được
+# Cho phép script start.sh thực thi
 RUN chmod +x /app/start.sh
 
-# Port Render sẽ map
+# Render sẽ map port này
 EXPOSE 10000
 
-# Healthcheck đơn giản (tùy chọn)
-# Có curl ở trên nên check được; nếu bạn có /api/health thì đổi URL phù hợp
+# Healthcheck (tùy chọn) – nếu có endpoint / hoặc /api/health thì giữ
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
   CMD curl -fsS http://localhost:10000/ || exit 1
 
-# Chạy script khởi động (tạo DB, APP_KEY, migrate, storage link, serve)
-CMD ["bash", "start.sh"]
+# Chạy script khởi động (tạo DB, APP_KEY, migrate, serve)
+CMD ["bash", "/app/start.sh"]
