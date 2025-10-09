@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 set -e
 
-# Tạo file DB SQLite nếu chưa tồn tại
+# Tạo file DB SQLite nếu chưa có
 mkdir -p database
 [ -f database/database.sqlite ] || touch database/database.sqlite
 
-# Sinh APP_KEY nếu chưa có
-php artisan key:generate --force || true
+# Nếu APP_KEY chưa có, sinh và export vào env (không ghi .env)
+if [ -z "$APP_KEY" ]; then
+  export APP_KEY=$(php artisan key:generate --show)
+fi
 
-# Link storage (nếu đã link rồi sẽ không lỗi)
+# Link storage, migrate, cache config
 php artisan storage:link || true
-
-# Chạy migrate (an toàn khi chạy nhiều lần)
+php artisan config:clear
 php artisan migrate --force || true
 
-# Serve Laravel
+# Chạy server
 php artisan serve --host 0.0.0.0 --port 10000
