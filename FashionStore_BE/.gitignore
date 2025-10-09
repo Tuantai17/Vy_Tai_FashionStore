@@ -22,3 +22,8 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+
+
+# Allow SQLite database to be committed
+!/database/database.sqlite
