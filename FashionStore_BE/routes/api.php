@@ -8,6 +8,11 @@ use App\Models\Order;
 use App\Http\Controllers\Api\MomoController;
 use App\Models\Payment;
 
+
+
+use App\Http\Controllers\Api\NewsController;
+
+
 use App\Http\Controllers\Api\{
     ProductController,
     CategoryController,
@@ -18,6 +23,13 @@ use App\Http\Controllers\Api\{
     ReviewController
 };
 
+
+
+
+
+
+Route::get('/news', [NewsController::class, 'index']);
+Route::get('/news/{slug}', [NewsController::class, 'show']);
 
 // //momo
 // Route::post('/payments/momo/create', [MomoController::class, 'create']);  // tạo lệnh thanh toán

@@ -90,7 +90,7 @@ class OrderController extends Controller
     public function show(Order $order)
     {
         $order->load(['details.product:id,name,thumbnail'])
-              ->loadSum('details as total', 'amount');
+            ->loadSum('details as total', 'amount');
 
         return response()->json([
             'id'         => $order->id,
@@ -151,13 +151,13 @@ class OrderController extends Controller
         if (ctype_digit((string)$code)) $q->where('id', (int)$code);
         else $q->where('code', $code);
 
-        if ($phone) $q->where('phone', 'like', '%'.$phone.'%');
+        if ($phone) $q->where('phone', 'like', '%' . $phone . '%');
 
         $order = $q->first();
-        if (!$order) return response()->json(['message'=>'Order not found'], 404);
+        if (!$order) return response()->json(['message' => 'Order not found'], 404);
 
         $order->load(['details.product:id,name,thumbnail'])
-              ->loadSum('details as total', 'amount');
+            ->loadSum('details as total', 'amount');
 
         $items = $order->details->map(function ($d) {
             $p = $d->product;
@@ -199,6 +199,7 @@ class OrderController extends Controller
     }
 
     // ====== Cập nhật step (giữ nguyên, chỉ chặn nếu đã hủy) ======
+
     public function updateStatusStep(Request $request, Order $order)
     {
         // Nếu đã hủy rồi thì không cho đổi
@@ -207,7 +208,26 @@ class OrderController extends Controller
         }
 
         $status = $request->input('status_step') ?? $request->input('status');
+        $statusKey = strtolower($status);
 
+        // Nếu xác nhận đơn hàng (confirmed) - trừ số lượng tồn kho
+        if ($statusKey === 'confirmed') {
+            // Load chi tiết đơn hàng và sản phẩm
+            $order->load('details.product');
+
+            foreach ($order->details as $detail) {
+                $product = $detail->product;
+                if ($product) {
+                    // Trừ số lượng tồn
+                    $product->qty = max(0, $product->qty - $detail->qty);
+                    $product->save();
+                }
+            }
+
+            $order->confirmed_at = now();
+        }
+
+        // Cập nhật trạng thái đơn hàng
         $map = [
             'pending'   => 0,
             'confirmed' => 1,
@@ -216,11 +236,10 @@ class OrderController extends Controller
             'delivered' => 4,
         ];
 
-        $statusKey = strtolower($status);
         $order->status_step = $statusKey;
-        $order->step_code   = $map[$statusKey] ?? 0;
+        $order->step_code = $map[$statusKey] ?? 0;
 
-        if ($statusKey === 'confirmed') $order->confirmed_at = now();
+        // Cập nhật thời gian các bước
         if ($statusKey === 'ready')     $order->ready_at = now();
         if ($statusKey === 'shipping')  $order->shipped_at = now();
         if ($statusKey === 'delivered') $order->delivered_at = now();
@@ -229,7 +248,6 @@ class OrderController extends Controller
 
         return response()->json($order);
     }
-
     public function updateStatusStepById(Request $r)
     {
         $order = Order::findOrFail($r->id);
