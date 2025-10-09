@@ -337,7 +337,26 @@ function Layout({ children }) {
           />
 
 
-
+{/* Tin tức */}
+<NavLink
+  to="/news"
+  id="news-target"
+  title="Tin tức"
+  className={({ isActive }) => (isActive ? "ring-2 ring-black" : "")}
+  style={{
+    width: 33,
+    height: 33,
+    borderRadius: "50%",
+    border: "1px solid #d1d5db",
+    display: "inline-block",
+    backgroundImage: "url('http://127.0.0.1:8000/assets/images/news.png')", // đổi tên file nếu khác
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+    marginRight: 10,
+    transform: "translateY(12px)",
+  }}
+/>
 
           {/* User / Logout giữ nguyên */}
           {user ? (
