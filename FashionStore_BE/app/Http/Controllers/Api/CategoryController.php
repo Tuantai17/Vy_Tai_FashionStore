@@ -8,273 +8,206 @@ use Illuminate\Http\Request;
 
 class CategoryController extends Controller
 {
-    // ✅ Lấy tất cả danh mục (Customer đang dùng)
+    // ====== Public list (giữ nguyên nếu đang dùng cho FE khách) ======
     public function index()
     {
-        $cats = Category::all()->map(function ($cat) {
-            $cat->image_url = $cat->image 
-                ? url('assets/images/' . $cat->image) 
-                : null;
+        $cats = Category::select(['id', 'name', 'slug', 'image', 'parent_id', 'sort_order', 'description', 'status'])
+            ->latest('id')
+            ->get();
+
+        // map image_url giống trước
+        $cats->transform(function ($cat) {
+            $cat->image_url = $cat->image ? url('assets/images/' . ltrim($cat->image, '/')) : null;
             return $cat;
         });
 
         return response()->json($cats);
     }
 
-    // ✅ Lấy chi tiết danh mục theo id (Customer đang dùng)
-    public function show($id)
+    // ====== ADMIN LIST (phân trang giống Product) ======
+    public function adminIndex(Request $request)
     {
-        $cat = Category::find($id);
-        if (!$cat) {
-            return response()->json(['message' => 'Category not found'], 404);
+        $query = Category::select(['id', 'name', 'slug', 'image', 'parent_id', 'sort_order', 'description', 'status'])
+            ->latest('id');
+
+        $perPage = (int) $request->query('per_page', 10);
+
+        if ($request->boolean('all') || $perPage === -1) {
+            $items = $query->get();
+            $items->transform(function ($c) {
+                $c->image_url = $c->image ? url('assets/images/' . ltrim($c->image, '/')) : null;
+                return $c;
+            });
+            return response()->json($items);
         }
 
-        $cat->image_url = $cat->image 
-            ? url('assets/images/' . $cat->image) 
-            : null;
+        if ($perPage <= 0) $perPage = 10;
+
+        $paginator = $query->paginate($perPage);
+        $paginator->getCollection()->transform(function ($c) {
+            $c->image_url = $c->image ? url('assets/images/' . ltrim($c->image, '/')) : null;
+            return $c;
+        });
+
+        return response()->json($paginator);
+    }
+
+    // ====== CREATE / UPDATE (giữ nguyên của bạn) ======
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'name'        => 'required|string|max:1000',
+            'slug'        => 'required|string|max:1000|unique:nqtv_category,slug',
+            'parent_id'   => 'nullable|integer',
+            'sort_order'  => 'nullable|integer',
+            'description' => 'nullable|string',
+            'status'      => 'nullable|integer',
+            'image'       => 'nullable|image|max:4096', // 👈 file ảnh
+        ]);
+
+        if ($request->hasFile('image')) {
+            $data['image'] = $request->file('image')->store('categories', 'public');
+            // ví dụ: categories/abc.png
+
+        }
+
+        $data['created_by'] = 1;
+        $data['status'] = $data['status'] ?? 1;
+
+        $cat = Category::create($data);
+        return response()->json(['message' => 'Thêm danh mục thành công', 'category' => $cat], 201);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $cat = Category::find($id);
+        if (!$cat) return response()->json(['message' => 'Category not found'], 404);
+
+        $data = $request->validate([
+            'name'        => 'required|string|max:1000',
+            'slug'        => 'required|string|max:1000|unique:nqtv_category,slug,' . $id,
+            'parent_id'   => 'nullable|integer',
+            'sort_order'  => 'nullable|integer',
+            'description' => 'nullable|string',
+            'status'      => 'nullable|integer',
+            'image'       => 'nullable|image|max:4096', // 👈 file ảnh
+        ]);
+
+        if ($request->hasFile('image')) {
+            $data['image'] = $request->file('image')->store('categories', 'public');
+        }
+
+        $data['updated_by'] = 1;
+        $cat->update($data);
+
+        return response()->json(['message' => 'Cập nhật danh mục thành công', 'category' => $cat]);
+    }
+
+
+
+    // app/Http/Controllers/Api/CategoryController.php
+    public function show($id)
+    {
+        // chỉ lấy các field cần, model Category đã có accessor image_url
+        $cat = Category::select('id', 'name', 'slug', 'image', 'parent_id', 'sort_order', 'description', 'status')
+            ->find($id);
+
+        if (!$cat) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        // nếu muốn chắc chắn có image_url khi select thủ công:
+        $cat->setAppends(['image_url']);
 
         return response()->json($cat);
     }
 
-    // ✅ Thêm mới danh mục (Admin dùng)
-   public function store(Request $request)
-{
-    $data = $request->validate([
-        'name'        => 'required|string|max:1000',
-        'slug'        => 'required|string|max:1000|unique:nqtv_category,slug',
-        'image'       => 'nullable|string|max:1000',
-        'parent_id'   => 'nullable|integer',
-        'sort_order'  => 'nullable|integer',
-        'description' => 'nullable|string',
-        'status'      => 'nullable|integer',
-    ]);
 
-    $data['created_by'] = 1;
-    $data['status'] = $data['status'] ?? 1; // ✅ nếu không có thì mặc định là 1
 
-    $cat = Category::create($data);
+    // public function update(Request $request, $id)
+    // {
+    //     $cat = Category::find($id);
+    //     if (!$cat) return response()->json(['message' => 'Category not found'], 404);
 
-    $cat->image_url = $cat->image 
-        ? url('assets/images/' . $cat->image) 
-        : null;
+    //     $data = $request->validate([
+    //         'name'        => 'required|string|max:1000',
+    //         'slug'        => 'required|string|max:1000|unique:nqtv_category,slug,' . $id,
+    //         'image'       => 'nullable|image|max:1000',
+    //         'parent_id'   => 'nullable|integer',
+    //         'sort_order'  => 'nullable|integer',
+    //         'description' => 'nullable|string',
+    //         'status'      => 'nullable|integer',
+    //     ]);
 
-    return response()->json([
-        'message'  => 'Thêm danh mục thành công',
-        'category' => $cat,
-    ], 201);
-}
+    //     $data['updated_by'] = 1;
 
-public function destroy($id)
+    //     $cat->update($data);
+    //     $cat->image_url = $cat->image ? url('assets/images/' . ltrim($cat->image, '/')) : null;
+
+    //     return response()->json([
+    //         'message'  => 'Cập nhật danh mục thành công',
+    //         'category' => $cat,
+    //     ]);
+    // }
+
+    // ====== SOFT DELETE (xoá tạm) ======
+    public function destroy($id)
     {
         $cat = Category::find($id);
+        if (!$cat) return response()->json(['message' => 'Category not found'], 404);
 
-        if (!$cat) {
-            return response()->json(['message' => 'Category not found'], 404);
+        $cat->delete(); // SoftDeletes
+        return response()->json(['message' => 'Soft deleted']);
+    }
+
+    // ====== LIST TRASH ======
+    public function trash(Request $request)
+    {
+        $perPage = (int) $request->query('per_page', 10);
+        if ($perPage <= 0) $perPage = 10;
+
+        $q = trim((string) $request->query('q', ''));
+
+        $query = Category::onlyTrashed()
+            ->select(['id', 'name', 'slug', 'image', 'parent_id', 'sort_order', 'description', 'status'])
+            ->latest('deleted_at');
+
+        if ($q !== '') {
+            $query->where(function ($sub) use ($q) {
+                $sub->where('name', 'like', "%{$q}%")
+                    ->orWhere('slug', 'like', "%{$q}%");
+            });
         }
 
-        $cat->delete();
+        $paginator = $query->paginate($perPage)->appends($request->query());
+        $paginator->getCollection()->transform(function ($c) {
+            $c->image_url = $c->image ? url('assets/images/' . ltrim($c->image, '/')) : null;
+            return $c;
+        });
 
-        return response()->json(['message' => 'Xóa danh mục thành công']);
+        return response()->json($paginator);
     }
 
+    // ====== RESTORE ======
+    public function restore($id)
+    {
+        $cat = Category::onlyTrashed()->find($id);
+        if (!$cat) return response()->json(['message' => 'Not found'], 404);
 
-    public function update(Request $request, $id)
-{
-    $cat = Category::find($id);
-    if (!$cat) {
-        return response()->json(['message' => 'Category not found'], 404);
+        $cat->restore();
+        return response()->json(['message' => 'Restored']);
     }
 
-    $data = $request->validate([
-        'name'        => 'required|string|max:1000',
-        'slug'        => 'required|string|max:1000|unique:nqtv_category,slug,' . $id,
-        'image'       => 'nullable|string|max:1000',
-        'parent_id'   => 'nullable|integer',
-        'sort_order'  => 'nullable|integer',
-        'description' => 'nullable|string',
-        'status'      => 'nullable|integer',
-    ]);
+    // ====== FORCE DELETE ======
+    public function forceDestroy($id)
+    {
+        $cat = Category::onlyTrashed()->find($id);
+        if (!$cat) return response()->json(['message' => 'Not found'], 404);
 
-    $data['updated_by'] = 1; // Hoặc Auth::id()
+        // Ảnh đang để ở public/assets/images => KHÔNG xoá bằng Storage::disk('public')
+        // Nếu sau này chuyển sang storage('public') thì bổ sung xoá file ở đây.
 
-    $cat->update($data);
-
-    $cat->image_url = $cat->image 
-        ? url('assets/images/' . $cat->image) 
-        : null;
-
-    return response()->json([
-        'message' => 'Cập nhật danh mục thành công',
-'category' => $cat,
-    ]);
+        $cat->forceDelete();
+        return response()->json(['message' => 'Deleted forever']);
+    }
 }
-
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// namespace App\Http\Controllers\Api;
-
-// use App\Http\Controllers\Controller;
-// use App\Models\Category;
-// use Illuminate\Http\Request;
-// use Illuminate\Support\Str;
-// use Illuminate\Validation\Rule;
-// use Illuminate\Support\Facades\Auth;
-
-// class CategoryController extends Controller
-// {
-//     /**
-//      * GET /api/categories
-//      * - Mặc định trả danh sách nhẹ cho dropdown (id, name, parent_id)
-//      * - Nếu ?full=1 thì trả đầy đủ + image_url (giữ nguyên behavior bạn đã dùng)
-//      */
-//     public function index(Request $request)
-//     {
-//         if ($request->boolean('full')) {
-//             $cats = Category::orderBy('name')->get()->map(function ($cat) {
-//                 $cat->image_url = $this->makeImageUrl($cat->image);
-//                 return $cat;
-//             });
-//             return response()->json($cats);
-//         }
-
-//         // Danh sách nhẹ cho select cha
-//         $items = Category::orderBy('name')->get(['id', 'name', 'parent_id']);
-//         return response()->json(['data' => $items]);
-//     }
-
-//     /**
-//      * GET /api/categories/{id}
-//      * Chi tiết danh mục + image_url (giữ nguyên behavior bạn đã có)
-//      */
-//     public function show($id)
-//     {
-//         $cat = Category::find($id);
-//         if (!$cat) {
-//             return response()->json(['message' => 'Category not found'], 404);
-//         }
-
-//         $cat->image_url = $this->makeImageUrl($cat->image);
-//         return response()->json($cat);
-//     }
-
-//     /**
-//      * POST /api/categories
-//      * Tạo mới danh mục + upload ảnh vào storage/public/categories
-//      */
-//     public function store(Request $request)
-//     {
-//         $data = $request->validate([
-//             'name'        => ['required', 'string', 'max:1000'],
-//             'slug'        => ['nullable', 'string', 'max:1000'],
-//             'parent_id'   => ['nullable', 'integer', 'exists:nqtv_category,id'],
-//             'sort_order'  => ['nullable', 'integer'],
-//             'description' => ['nullable', 'string'],
-//             'status'      => ['required', Rule::in([0, 1])],
-//             'image'       => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
-//         ]);
-
-//         $data['slug'] = Str::slug($data['slug'] ?? $data['name']);
-//         $data['created_by'] = Auth::id() ?? 0;
-
-//         if ($request->hasFile('image')) {
-//             // Lưu: storage/app/public/categories/xxxx.jpg
-//             $path = $request->file('image')->store('categories', 'public');
-//             $data['image'] = $path; // lưu đường dẫn tương đối
-//         }
-
-//         $category = Category::create($data);
-
-//         // Đính kèm image_url để FE dùng ngay nếu muốn
-//         $category->image_url = $this->makeImageUrl($category->image);
-
-//         return response()->json([
-//             'message' => 'Tạo danh mục thành công',
-//             'data'    => $category,
-//         ], 201);
-//     }
-
-//     /**
-//      * Chuẩn hoá URL ảnh cho cả hai cách lưu:
-//      * - URL tuyệt đối (http/https) -> giữ nguyên
-//      * - storage/public/categories/... -> asset('storage/...')
-//      * - hoặc ảnh cũ để trong public/assets/images -> url('assets/images/...')
-//      */
-//     private function makeImageUrl(?string $image): ?string
-//     {
-//         if (!$image) {
-//             return null;
-//         }
-
-//         // Nếu đã là URL tuyệt đối hoặc bắt đầu bằng "/" thì trả nguyên
-//         if (Str::startsWith($image, ['http://', 'https://', '/'])) {
-//             return $image;
-//         }
-
-//         // Nếu là đường dẫn lưu trên disk public (ví dụ "categories/abc.jpg")
-//         // thì ưu tiên trả về qua /storage
-//         if (!Str::startsWith($image, 'assets/images/')) {
-//             return asset('storage/' . ltrim($image, '/'));
-//         }
-
-//         // Trường hợp bạn vẫn lưu vào public/assets/images
-//         return url($image);
-//     }
-// }

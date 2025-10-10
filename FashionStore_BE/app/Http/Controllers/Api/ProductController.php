@@ -75,38 +75,71 @@ class ProductController extends Controller
     //     return $products->makeHidden(['brand', 'brand_id']);
     // }
 
+    // ====================== PUBLIC LIST ======================
     public function index(Request $request)
     {
-        $query = Product::with('brand:id,name')
-            ->select(['id', 'name', 'brand_id', 'price_sale as price', 'thumbnail'])
+        $query = Product::with(['brand:id,name', 'category:id,name'])
+            ->select(['id', 'name', 'brand_id', 'category_id', 'price_sale as price', 'thumbnail'])
             ->latest('id');
 
-        // NEW: cho phép lấy tất cả
         $perPage = (int) $request->query('per_page', 12);
         $all     = $request->boolean('all') || $perPage === -1;
 
         if ($all) {
-            // trả full list
-            return $query->get()->makeHidden(['brand', 'brand_id']);
+            $items = $query->get();
+            // Ẩn khóa nội bộ; nếu Model có appends (thumbnail_url, brand_name, category_name) thì FE dùng trực tiếp
+            return $items->makeHidden(['brand', 'brand_id', 'category', 'category_id']);
         }
 
         $perPage = $perPage > 0 ? $perPage : 12;
-        return $query->paginate($perPage)->makeHidden(['brand', 'brand_id']);
+        $paginator = $query->paginate($perPage);
+        $paginator->getCollection()->transform(
+            fn($m) => $m->makeHidden(['brand', 'brand_id', 'category', 'category_id'])
+        );
+
+        return response()->json($paginator);
+    }
+
+    public function byCategory(Request $request, $id)
+    {
+        $query = Product::with(['brand:id,name', 'category:id,name'])
+            ->where('category_id', $id)
+            ->select(['id', 'name', 'brand_id', 'category_id', 'price_sale as price', 'thumbnail'])
+            ->latest('id');
+
+        $perPage = (int) $request->query('per_page', 12);
+        $all     = $request->boolean('all') || $perPage === -1;
+
+        if ($all) {
+            $items = $query->get();
+            return $items->makeHidden(['brand', 'brand_id', 'category', 'category_id']);
+        }
+
+        if ($perPage <= 0) $perPage = 12;
+
+        $paginator = $query->paginate($perPage);
+        $paginator->getCollection()->transform(
+            fn($m) => $m->makeHidden(['brand', 'brand_id', 'category', 'category_id'])
+        );
+
+        return response()->json($paginator);
     }
 
     public function show($id)
     {
-        $p = Product::with('brand:id,name')
+        $p = Product::with(['brand:id,name', 'category:id,name'])
             ->select([
                 'id',
                 'name',
+                'slug',
                 'brand_id',
+                'category_id',
+                'price_root',
                 'price_sale as price',
                 'thumbnail',
                 'detail',
                 'description',
-                'category_id',
-                'qty',  // Add this field
+                'qty',
                 'status'
             ])
             ->find($id);
@@ -115,19 +148,22 @@ class ProductController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        return $p->makeHidden(['brand', 'brand_id']);
+        // Vá trường hợp mô tả lỗi UTF-8 (hiếm khi gặp)
+        if (!is_null($p->description) && !mb_check_encoding($p->description, 'UTF-8')) {
+            $p->description = mb_convert_encoding($p->description, 'UTF-8', 'auto');
+        }
+        if (!is_null($p->detail) && !mb_check_encoding($p->detail, 'UTF-8')) {
+            $p->detail = mb_convert_encoding($p->detail, 'UTF-8', 'auto');
+        }
+
+        $payload = $p->makeHidden(['brand', 'brand_id', 'category', 'category_id'])
+            ->append(['thumbnail_url', 'brand_name', 'category_name']);
+
+        // ✅ Không escape Unicode/Slash để tránh 500 khi có HTML & ký tự tiếng Việt
+        return response()->json($payload, 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
-    public function byCategory($id)
-    {
-        $items = Product::with('brand:id,name')
-            ->where('category_id', $id)
-            ->select(['id', 'name', 'brand_id', 'price_sale as price', 'thumbnail'])
-            ->latest('id')
-            ->paginate(12);
 
-        return $items->makeHidden(['brand', 'brand_id']);
-    }
 
     // ====================== ADMIN LIST ======================
     public function adminIndex(Request $request)

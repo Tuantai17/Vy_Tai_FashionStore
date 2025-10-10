@@ -1,11 +1,10 @@
-// Trash.jsx
+// CategoryTrash.jsx
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 const API_BASE = "http://127.0.0.1:8000/api";
-const APP_BASE = API_BASE.replace(/\/api$/, "");
 
-export default function Trash() {
+export default function CategoryTrash() {
   const [items, setItems] = useState([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
@@ -28,17 +27,14 @@ export default function Trash() {
     usp.set("per_page", String(perPage));
     if (q.trim()) usp.set("q", q.trim());
 
-    const res = await fetch(`${API_BASE}/admin/products/trash?${usp.toString()}`, { signal });
+    const res = await fetch(`${API_BASE}/admin/categories/trash?${usp.toString()}`, { signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    // Laravel paginator shape
     const list = Array.isArray(data) ? data : data.data ?? [];
     setItems(list);
     setTotal(data.total ?? list.length ?? 0);
     setLastPage(data.last_page ?? 1);
-
-    // nếu backend trả current_page
     setPage(data.current_page ?? page);
   };
 
@@ -49,18 +45,16 @@ export default function Trash() {
         setLoading(true);
         setErr("");
         await fetchTrash(ac.signal);
-        // reset chọn khi refetch
-        setSelectedIds(new Set());
+        setSelectedIds(new Set()); // reset chọn khi refetch
       } catch (e) {
-        if (e.name !== "AbortError") setErr("Không tải được thùng rác.");
+        if (e.name !== "AbortError") setErr("Không tải được thùng rác danh mục.");
       } finally {
         setLoading(false);
       }
     })();
     return () => ac.abort();
-  }, [page, perPage]); // tìm kiếm sẽ trigger bằng nút, không auto onChange
+  }, [page, perPage]);
 
-  // ===== search on button click =====
   const handleSearch = async () => {
     setPage(1);
     const ac = new AbortController();
@@ -69,7 +63,7 @@ export default function Trash() {
       await fetchTrash(ac.signal);
       setSelectedIds(new Set());
     } catch (e) {
-      if (e.name !== "AbortError") setErr("Không tải được thùng rác.");
+      if (e.name !== "AbortError") setErr("Không tải được thùng rác danh mục.");
     } finally {
       setLoading(false);
     }
@@ -78,19 +72,17 @@ export default function Trash() {
   // ===== one: restore & force-delete =====
   const handleRestore = async (id) => {
     try {
-      const res = await fetch(`${API_BASE}/admin/products/${id}/restore`, {
+      const res = await fetch(`${API_BASE}/admin/categories/${id}/restore`, {
         method: "POST",
         headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
       if (!res.ok) throw new Error("Khôi phục thất bại");
-      // cập nhật UI
       setItems((list) => list.filter((x) => x.id !== id));
       setSelectedIds((prev) => {
         const n = new Set(prev);
         n.delete(id);
         return n;
       });
-      // nếu trang trống sau khi khôi phục, tự lùi trang (nếu có thể)
       if (items.length === 1 && page > 1) setPage((p) => p - 1);
       alert("✅ Đã khôi phục");
     } catch (e) {
@@ -99,13 +91,13 @@ export default function Trash() {
   };
 
   const handleForceDelete = async (id) => {
-    if (!window.confirm(`Xóa vĩnh viễn sản phẩm #${id}? Không thể hoàn tác!`)) return;
+    if (!window.confirm(`Xoá vĩnh viễn danh mục #${id}? Không thể hoàn tác!`)) return;
     try {
-      const res = await fetch(`${API_BASE}/admin/products/${id}/force-delete`, {
+      const res = await fetch(`${API_BASE}/admin/categories/${id}/force-delete`, {
         method: "POST",
         headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
-      if (!res.ok) throw new Error("Xóa vĩnh viễn thất bại");
+      if (!res.ok) throw new Error("Xoá vĩnh viễn thất bại");
       setItems((list) => list.filter((x) => x.id !== id));
       setSelectedIds((prev) => {
         const n = new Set(prev);
@@ -113,9 +105,9 @@ export default function Trash() {
         return n;
       });
       if (items.length === 1 && page > 1) setPage((p) => p - 1);
-      alert("🗑️ Đã xóa vĩnh viễn");
+      alert("🗑️ Đã xoá vĩnh viễn");
     } catch (e) {
-      alert("❌ " + (e.message || "Không xóa vĩnh viễn được"));
+      alert("❌ " + (e.message || "Không xoá vĩnh viễn được"));
     }
   };
 
@@ -123,11 +115,10 @@ export default function Trash() {
   const bulkRestore = async () => {
     if (selectedIds.size === 0) return;
     let ok = 0, fail = 0;
-
     await Promise.all(
       Array.from(selectedIds).map(async (id) => {
         try {
-          const res = await fetch(`${API_BASE}/admin/products/${id}/restore`, {
+          const res = await fetch(`${API_BASE}/admin/categories/${id}/restore`, {
             method: "POST",
             headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           });
@@ -138,7 +129,6 @@ export default function Trash() {
         }
       })
     );
-
     if (ok) setItems((list) => list.filter((x) => !selectedIds.has(x.id)));
     setSelectedIds(new Set());
     if (items.length === ok && page > 1) setPage((p) => p - 1);
@@ -147,13 +137,12 @@ export default function Trash() {
 
   const bulkForceDelete = async () => {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Xóa vĩnh viễn ${selectedIds.size} mục? Không thể hoàn tác!`)) return;
-
+    if (!window.confirm(`Xoá vĩnh viễn ${selectedIds.size} mục? Không thể hoàn tác!`)) return;
     let ok = 0, fail = 0;
     await Promise.all(
       Array.from(selectedIds).map(async (id) => {
         try {
-          const res = await fetch(`${API_BASE}/admin/products/${id}/force-delete`, {
+          const res = await fetch(`${API_BASE}/admin/categories/${id}/force-delete`, {
             method: "POST",
             headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           });
@@ -164,31 +153,27 @@ export default function Trash() {
         }
       })
     );
-
     if (ok) setItems((list) => list.filter((x) => !selectedIds.has(x.id)));
     setSelectedIds(new Set());
     if (items.length === ok && page > 1) setPage((p) => p - 1);
-    alert(`Đã xóa vĩnh viễn: thành công ${ok} • lỗi ${fail}`);
+    alert(`Đã xoá vĩnh viễn: thành công ${ok} • lỗi ${fail}`);
   };
 
-  // ===== client filter phụ (không bắt buộc nếu chỉ dùng server q) =====
-  const filtered = useMemo(() => {
-    // nếu đã search bằng server, có thể trả luôn items
-    return items;
-  }, [items]);
+  // ===== client filter (nếu đã search server thì trả thẳng items) =====
+  const filtered = useMemo(() => items, [items]);
 
   // ===== chọn / bỏ chọn =====
-  const toggleOne = (id) => {
+  const toggleOne = (id) =>
     setSelectedIds((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  };
+
   const allVisibleIds = filtered.map((x) => x.id);
   const isAllVisibleChecked =
     allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedIds.has(id));
-  const toggleAllVisible = () => {
+  const toggleAllVisible = () =>
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (isAllVisibleChecked) {
@@ -198,7 +183,6 @@ export default function Trash() {
       }
       return next;
     });
-  };
 
   // ===== pagination UI =====
   const canPrev = page > 1;
@@ -234,7 +218,7 @@ export default function Trash() {
             textShadow: "0 1px 2px rgba(0,0,0,.4)",
           }}
         >
-          Thùng rác sản phẩm
+          Thùng rác danh mục
         </h1>
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -311,7 +295,7 @@ export default function Trash() {
           <button
             onClick={bulkForceDelete}
             disabled={selectedIds.size === 0}
-            title={selectedIds.size ? `Xóa vĩnh viễn ${selectedIds.size} mục` : "Chọn mục để xóa vĩnh viễn"}
+            title={selectedIds.size ? `Xoá vĩnh viễn ${selectedIds.size} mục` : "Chọn mục để xoá vĩnh viễn"}
             style={{
               padding: "8px 12px",
               borderRadius: 10,
@@ -322,12 +306,11 @@ export default function Trash() {
               fontWeight: 700,
             }}
           >
-            Xóa vĩnh viễn (đã chọn){selectedIds.size ? ` (${selectedIds.size})` : ""}
+            Xoá vĩnh viễn (đã chọn){selectedIds.size ? ` (${selectedIds.size})` : ""}
           </button>
 
-          {/* quay về danh sách active */}
           <Link
-            to="/admin/products"
+            to="/admin/categories"
             style={{
               padding: "8px 12px",
               borderRadius: 10,
@@ -360,11 +343,7 @@ export default function Trash() {
           <table
             width="100%"
             cellPadding={10}
-            style={{
-              borderCollapse: "collapse",
-              borderRadius: 12,
-              overflow: "hidden",
-            }}
+            style={{ borderCollapse: "collapse", borderRadius: 12, overflow: "hidden" }}
           >
             <thead>
               <tr
@@ -386,16 +365,14 @@ export default function Trash() {
                 <th>ID</th>
                 <th>Tên</th>
                 <th>Slug</th>
-                <th style={{ textAlign: "right" }}>Giá gốc</th>
-                <th style={{ textAlign: "right" }}>Giá sale</th>
-                <th style={{ textAlign: "right" }}>Tồn kho</th>
                 <th style={{ textAlign: "center" }}>Ảnh</th>
+                <th>Mô tả</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p, i) => (
+              {filtered.map((c, i) => (
                 <tr
-                  key={p.id}
+                  key={c.id}
                   style={{
                     background: i % 2 === 0 ? "rgba(255,255,255,0.9)" : "rgba(248,250,252,0.95)",
                     borderTop: "1px solid #eee",
@@ -404,29 +381,31 @@ export default function Trash() {
                   <td align="center">
                     <input
                       type="checkbox"
-                      checked={selectedIds.has(p.id)}
-                      onChange={() => toggleOne(p.id)}
+                      checked={selectedIds.has(c.id)}
+                      onChange={() => toggleOne(c.id)}
                     />
                   </td>
-                  <td>{p.id}</td>
-                  <td style={{ fontWeight: 600 }}>{p.name}</td>
-                  <td style={{ color: "#475569" }}>{p.slug}</td>
-                  <td align="right">₫{(p.price_root || 0).toLocaleString("vi-VN")}</td>
-                  <td align="right">₫{(p.price_sale || 0).toLocaleString("vi-VN")}</td>
-                  <td align="right" style={{ fontWeight: 600 }}>{p.qty}</td>
+                  <td>{c.id}</td>
+                  <td style={{ fontWeight: 600 }}>{c.name}</td>
+                  <td style={{ color: "#475569" }}>{c.slug}</td>
                   <td align="center">
-                    <img
-                      src={p.thumbnail_url || `${APP_BASE}/storage/${p.thumbnail}`}
-                      alt={p.name}
-                      style={{ width: 60, height: 40, objectFit: "cover", borderRadius: 6 }}
-                    />
+                    {c.image_url ? (
+                      <img
+                        src={c.image_url}
+                        alt={c.name}
+                        style={{ width: 60, height: 40, objectFit: "cover", borderRadius: 6 }}
+                      />
+                    ) : (
+                      "-"
+                    )}
                   </td>
+                  <td style={{ color: "#374151" }}>{c.description}</td>
                   
                 </tr>
               ))}
               {!filtered.length && (
                 <tr>
-                  <td colSpan={9} align="center" style={{ padding: 18, color: "#777" }}>
+                  <td colSpan={7} align="center" style={{ padding: 18, color: "#777" }}>
                     Không có dữ liệu
                   </td>
                 </tr>
@@ -453,28 +432,28 @@ export default function Trash() {
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
-              onClick={() => canPrev && setPage((p) => p - 1)}
-              disabled={!canPrev}
+              onClick={() => page > 1 && setPage((p) => p - 1)}
+              disabled={page <= 1}
               style={{
                 padding: "8px 12px",
                 borderRadius: 8,
                 border: "1px solid #e5e7eb",
-                background: canPrev ? "#fff" : "#f3f4f6",
-                cursor: canPrev ? "pointer" : "not-allowed",
+                background: page > 1 ? "#fff" : "#f3f4f6",
+                cursor: page > 1 ? "pointer" : "not-allowed",
                 fontWeight: 600,
               }}
             >
               ← Trước
             </button>
             <button
-              onClick={() => canNext && setPage((p) => p + 1)}
-              disabled={!canNext}
+              onClick={() => page < lastPage && setPage((p) => p + 1)}
+              disabled={page >= lastPage}
               style={{
                 padding: "8px 12px",
                 borderRadius: 8,
                 border: "1px solid #e5e7eb",
-                background: canNext ? "#fff" : "#f3f4f6",
-                cursor: canNext ? "pointer" : "not-allowed",
+                background: page < lastPage ? "#fff" : "#f3f4f6",
+                cursor: page < lastPage ? "pointer" : "not-allowed",
                 fontWeight: 600,
               }}
             >

@@ -28,7 +28,6 @@ export default function Products() {
         setLoading(true);
         setErr("");
 
-        // endpoint khác nhau theo view (dùng paginator)
         const endpoint =
           view === "trash"
             ? `${API_BASE}/admin/products/trash?per_page=${perPage}&page=${page}`
@@ -38,7 +37,6 @@ export default function Products() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
-        // Chuẩn hoá theo paginator của Laravel
         if (Array.isArray(data)) {
           setItems(data);
           setLastPage(1);
@@ -50,7 +48,7 @@ export default function Products() {
           setTotal(Number(data.total ?? list.length));
         }
 
-        setSelectedIds(new Set()); // reset chọn mỗi lần đổi trang/view
+        setSelectedIds(new Set());
       } catch (e) {
         if (e.name !== "AbortError") setErr("Không tải được danh sách sản phẩm.");
       } finally {
@@ -60,7 +58,6 @@ export default function Products() {
     return () => ac.abort();
   }, [view, page]);
 
-  // Reset về trang 1 khi đổi view
   useEffect(() => {
     setPage(1);
   }, [view]);
@@ -222,7 +219,22 @@ export default function Products() {
     }
   };
 
-  // ===== filter client (chỉ lọc trong trang hiện tại) =====
+  // ===== SHOW: mở trang chi tiết sản phẩm (có cả đánh giá) =====
+  // const handleShowSelected = () => {
+  //   if (selectedIds.size !== 1) return;
+  //   const id = Array.from(selectedIds)[0];
+  //   // Mở trang khách hàng /products/:id (hiển thị đầy đủ thông tin + reviews)
+  //   window.open(`/products/${id}`, "_blank"); // mở tab mới; dùng navigate(`/products/${id}`) nếu muốn trong SPA
+  // };
+
+  const handleShowSelected = () => {
+   if (selectedIds.size !== 1) return;
+   const id = Array.from(selectedIds)[0];
+   // sang trang show ở admin
+   navigate(`/admin/products/${id}`);
+ };
+
+  // ===== filter client =====
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return items;
@@ -311,7 +323,7 @@ export default function Products() {
         >
           Quản lý sản phẩm {view === "trash" ? "— Thùng rác" : ""}
         </h1>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -331,6 +343,28 @@ export default function Products() {
 
           {view === "active" ? (
             <>
+              {/* Nút Xem (SHOW) — bật khi chọn đúng 1 sản phẩm */}
+              <button
+                onClick={handleShowSelected}
+                disabled={selectedIds.size !== 1}
+                title={
+                  selectedIds.size === 1
+                    ? "Xem chi tiết sản phẩm (mở tab mới)"
+                    : "Chọn đúng 1 sản phẩm để xem"
+                }
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 10,
+                  border: "1px solid #2563eb",
+                  background: selectedIds.size === 1 ? "#fff" : "#f1f5f9",
+                  color: selectedIds.size === 1 ? "#1d4ed8" : "#94a3b8",
+                  cursor: selectedIds.size === 1 ? "pointer" : "not-allowed",
+                  fontWeight: 700,
+                }}
+              >
+                Xem
+              </button>
+
               <button
                 onClick={() => handleBulkAction("soft-delete")}
                 disabled={selectedIds.size === 0}
@@ -348,6 +382,7 @@ export default function Products() {
               >
                 Xóa tạm (đã chọn){selectedIds.size ? ` (${selectedIds.size})` : ""}
               </button>
+
               <button
                 onClick={() => navigate("/admin/products/new")}
                 style={{

@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Editor } from "@tinymce/tinymce-react";
+
 
 const API_BASE = "http://127.0.0.1:8000/api";
 const PLACEHOLDER = "https://placehold.co/120x120?text=No+Image";
-
-
-
-
 
 export default function AddProduct() {
   const navigate = useNavigate();
@@ -242,16 +240,62 @@ export default function AddProduct() {
         </div>
 
         <div className="admin-form-field">
-          <label className="admin-form-label">Mo ta</label>
-          <textarea
-            name="description"
-            value={form.description}
-            onChange={onChange}
-            className="admin-form-control admin-form-textarea"
-            rows="4"
-          />
-          {fieldErrors.description && <small className="admin-form-error-text">{fieldErrors.description[0]}</small>}
-        </div>
+  <label className="admin-form-label">Mô tả</label>
+
+  <Editor
+    apiKey="wytgyqmbl6rj0c9rw03s5uep2xrd9iit95fmkka5zqb42det" // để trống cũng chạy; có key sẽ tốt hơn
+    value={form.description}
+    onEditorChange={(content) =>
+      setForm((s) => ({ ...s, description: content }))
+    }
+    init={{
+      height: 380,
+      menubar: "file edit view insert format tools table help",
+      plugins:
+        "advlist autolink lists link image charmap preview anchor " +
+        "searchreplace visualblocks code fullscreen " +
+        "insertdatetime media table code help wordcount paste",
+      toolbar:
+        "undo redo | blocks | bold italic underline strikethrough | " +
+        "alignleft aligncenter alignright alignjustify | " +
+        "bullist numlist outdent indent | table | link image media | " +
+        "removeformat | preview code",
+      // Cho dán từ Word giữ định dạng
+      paste_data_images: true,
+      paste_as_text: false,
+
+      // Ảnh: lưu base64 đơn giản (nhanh gọn). Khi cần upload server, đổi sang images_upload_handler phía dưới.
+      automatic_uploads: true,
+      images_file_types: "jpg,jpeg,png,gif,webp",
+      images_upload_handler: (blobInfo, progress) =>
+        new Promise((resolve, reject) => {
+          // ✅ Cách 1 (đơn giản): base64 inline
+          const base64 = "data:" + blobInfo.blob().type + ";base64," + blobInfo.base64();
+          resolve(base64);
+
+          // ❗ Nếu muốn upload lên Laravel: dùng Cách 2, comment Cách 1 và mở Cách 2
+          // // Cách 2: POST lên /api/uploads
+          // const fd = new FormData();
+          // fd.append("file", blobInfo.blob(), blobInfo.filename());
+          // fetch("http://127.0.0.1:8000/api/uploads", { method: "POST", body: fd })
+          //   .then(r => r.json())
+          //   .then(j => resolve(j.url))  // trả về URL public của ảnh
+          //   .catch(() => reject("Upload failed"));
+        }),
+
+      // Font/size giống Word hơn
+      toolbar_sticky: true,
+      branding: false,
+      content_style:
+        "body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6}",
+    }}
+  />
+
+  {fieldErrors.description && (
+    <small className="admin-form-error-text">{fieldErrors.description[0]}</small>
+  )}
+</div>
+
 
         <div className="admin-form-actions">
           <button

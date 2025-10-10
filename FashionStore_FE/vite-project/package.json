@@ -10,10 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tinymce/tinymce-react": "^6.3.0",
+    "dompurify": "^3.2.7",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.2",
-    "react-toastify": "^11.0.5"
+    "react-toastify": "^11.0.5",
+    "tinymce": "^8.1.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",

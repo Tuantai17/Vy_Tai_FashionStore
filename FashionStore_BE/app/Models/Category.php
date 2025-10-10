@@ -1,70 +1,75 @@
 <?php
-
+// app/Models/Category.php
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-// use Illuminate\Database\Eloquent\SoftDeletes; // nếu muốn xoá mềm thì bật
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 class Category extends Model
 {
-    use HasFactory;
-    // use SoftDeletes;
+    use SoftDeletes;
 
     protected $table = 'nqtv_category';
 
     protected $fillable = [
-        'name',
-        'slug',
-        'image',        // chỉ lưu tên file (vd: ao.jpg) hoặc đường dẫn tuỳ bạn
-        'parent_id',
-        'sort_order',
-        'description',
-        'created_by',
-        'updated_by',
-        'status',       // 0/1
+        'name','slug','image','parent_id','sort_order','description',
+        'created_by','updated_by','status',
     ];
 
     protected $casts = [
         'parent_id'  => 'integer',
         'sort_order' => 'integer',
-        'status'     => 'integer', // hoặc 'boolean' nếu bạn muốn true/false
+        'status'     => 'integer',
     ];
 
-    // FE nhận thêm field image_url luôn
     protected $appends = ['image_url'];
 
-    public function getImageUrlAttribute(): ?string
+    public function getImageUrlAttribute()
     {
-        if (!$this->image) return null;
+        // if (!$this->image) return null;
 
-        // Nếu DB đã lưu URL tuyệt đối thì trả nguyên
-        if (str_starts_with($this->image, 'http://')
-            || str_starts_with($this->image, 'https://')
-            || str_starts_with($this->image, '/')) {
-            return $this->image;
+        if (!$this->image) {
+            return asset('assets/images/no-image.png'); // ảnh mặc định
         }
 
-        // Bạn đang để ảnh trong public/assets/images
-        return url('assets/images/' . ltrim($this->image, '/'));
+        $path = ltrim($this->image, '/');
 
-        // Nếu sau này chuyển sang storage:
-        // return asset('storage/' . ltrim($this->image, '/'));
+        // Đã là URL tuyệt đối hoặc đường dẫn bắt đầu bằng /
+        // if (preg_match('#^(https?://|/)#', $this->image)) {
+        //     return $this->image;
+        // }
+
+        if (preg_match('~^https?://~i', $path)) {
+        return $path;
+    }
+        // Ảnh lưu trên disk public (storage/app/public/...)
+        // if (Storage::disk('public')->exists($this->image)) {
+        //     return Storage::url($this->image);   // -> /storage/categories/abc.png
+        // }
+
+        if (Storage::disk('public')->exists($path)) {
+        return asset('storage/' . $path);
     }
 
-    // Quan hệ sản phẩm (giữ nguyên)
-    public function products()
-    {
-        return $this->hasMany(Product::class, 'category_id');
+    // 3) Nếu đường dẫn bắt đầu bằng assets/... (ảnh cũ nằm trong /public/assets/images)
+    if (str_starts_with($path, 'assets/')) {
+        return asset($path);
     }
 
-    // Tuỳ chọn: nếu cần dùng cây danh mục:
-    public function parent()
-    {
-        return $this->belongsTo(self::class, 'parent_id');
+    // 4) Nếu tồn tại trong thư mục public/images hoặc assets/images
+    if (file_exists(public_path($path))) {
+        return asset($path);
     }
-    public function children()
-    {
-        return $this->hasMany(self::class, 'parent_id');
+
+    if (file_exists(public_path('assets/images/' . $path))) {
+        return asset('assets/images/' . $path);
+    }
+
+    // 5) fallback cuối cùng
+    return asset('assets/images/no-image.png');
+        
+        // Dự phòng: ảnh cũ còn nằm trong public/assets/images
+        // return url('assets/images/' . ltrim($this->image, '/'));
     }
 }

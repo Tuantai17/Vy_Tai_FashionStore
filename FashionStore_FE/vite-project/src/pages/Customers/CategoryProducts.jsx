@@ -1,47 +1,73 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-const API_BASE = "http://127.0.0.1:8000";
+const APP_BASE = "http://127.0.0.1:8000";
+const API_BASE = `${APP_BASE}/api`;
+
 const PLACEHOLDER = "https://placehold.co/300x200?text=No+Image";
 const VND = new Intl.NumberFormat("vi-VN");
 
 export default function CategoryProducts({ addToCart }) {
   const { id } = useParams(); // category id từ URL
   const [items, setItems] = useState([]);
-  const [cat, setCat] = useState(null); // ✅ thông tin danh mục
+  const [cat, setCat] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
   useEffect(() => {
     const ac = new AbortController();
 
+    const getJson = async (url) => {
+      try {
+        const r = await fetch(url, { signal: ac.signal });
+        if (r.ok) return await r.json();
+      } catch {}
+      return null;
+    };
+
     (async () => {
       try {
         setLoading(true);
         setErr("");
 
-        // ✅ lấy thông tin danh mục (ảnh + tên)
-        const resCat = await fetch(`${API_BASE}/categories/${id}`, {
-          signal: ac.signal,
-        });
-        if (!resCat.ok) throw new Error(`HTTP ${resCat.status}`);
-        const catData = await resCat.json();
-        setCat(catData);
+        // ✅ Lấy thông tin danh mục: ưu tiên /api, fallback route cũ nếu có
+        const catEndpoints = [
+          `${API_BASE}/categories/${id}`,
+          `${APP_BASE}/categories/${id}`,
+        ];
+        let catData = null;
+        for (const url of catEndpoints) {
+          catData = await getJson(url);
+          if (catData) break;
+        }
+        if (!catData) throw new Error("cat-not-found");
+        // Hỗ trợ cả dạng {data:{...}}
+        setCat(Array.isArray(catData) ? catData[0] : catData.data ?? catData);
 
-        // ✅ lấy sản phẩm thuộc danh mục
-        const resProds = await fetch(`${API_BASE}/categories/${id}/products`, {
-          signal: ac.signal,
-        });
-        if (!resProds.ok) throw new Error(`HTTP ${resProds.status}`);
+        // ✅ Lấy sản phẩm theo danh mục
+        const prodEndpoints = [
+          // thêm ?all=1 để FE nhận mảng phẳng
+          `${API_BASE}/categories/${id}/products?all=1`,
+          `${API_BASE}/products/category/${id}?all=1`, // alias
+          // fallback nếu backend không hỗ trợ all
+          `${API_BASE}/categories/${id}/products`,
+          `${API_BASE}/products/category/${id}`,
+          `${APP_BASE}/categories/${id}/products`,
+        ];
 
-        const data = await resProds.json();
-        const list = Array.isArray(data) ? data : data?.data ?? [];
+        let data = null;
+        for (const url of prodEndpoints) {
+          data = await getJson(url);
+          if (data) break;
+        }
+        if (!data) throw new Error("products-not-found");
+
+        const list = Array.isArray(data) ? data : data.data ?? [];
         setItems(list);
-
       } catch (e) {
         if (e.name !== "AbortError") {
-          console.error("Lỗi:", e);
           setErr("Không tải được sản phẩm hoặc danh mục.");
+          setItems([]);
         }
       } finally {
         setLoading(false);
@@ -56,20 +82,12 @@ export default function CategoryProducts({ addToCart }) {
 
   return (
     <div style={{ padding: 20 }}>
-      {/* ✅ Tiêu đề + ảnh danh mục */}
+      {/* ✅ Tiêu đề danh mục */}
       {cat && (
         <div style={{ marginBottom: 20, textAlign: "center" }}>
           <h2 style={{ marginBottom: 12, color: "#388e3c", fontSize: 26 }}>
             🌿 {cat.name}
           </h2>
-          {/* {cat.image_url && (
-            <img
-              src={cat.image_url}
-              alt={cat.name}
-              style={{ maxWidth: 300, borderRadius: 12 }}
-              onError={(e) => (e.currentTarget.src = PLACEHOLDER)}
-            />
-          )} */}
         </div>
       )}
 
@@ -90,9 +108,13 @@ export default function CategoryProducts({ addToCart }) {
           }}
         >
           {items.map((p) => {
-            const price = Number(p.price ?? 0);
-            const img =
-              p.thumbnail_url || p.image_url || p.thumbnail || p.image || PLACEHOLDER;
+            const price = Number(p.price ?? p.price_sale ?? 0);
+            const thumb =
+              p.thumbnail_url
+                ? p.thumbnail_url
+                : p.thumbnail
+                ? `${APP_BASE}/storage/${p.thumbnail}`
+                : p.image_url || p.image || PLACEHOLDER;
 
             return (
               <div
@@ -119,7 +141,7 @@ export default function CategoryProducts({ addToCart }) {
                     }}
                   >
                     <img
-                      src={img}
+                      src={thumb}
                       alt={p.name}
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
                       onError={(e) => (e.currentTarget.src = PLACEHOLDER)}

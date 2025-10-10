@@ -10,14 +10,29 @@ use Illuminate\Support\Facades\Hash;
 class UserController extends Controller
 {
     // ✅ Lấy danh sách tất cả user
-    public function index()
-    {
-        $users = User::select('id', 'name', 'email', 'phone', 'username', 'roles', 'status', 'created_at')
-            ->orderBy('id', 'desc')
-            ->get();
+    public function index(Request $request)
+{
+    $perPage = max(1, (int) $request->query('per_page', 10));
+    $q       = trim((string) ($request->query('q') ?? $request->query('search') ?? ''));
 
-        return response()->json($users);
+    $query = User::select('id','name','email','phone','username','roles','status','created_at')
+        ->latest('id');
+
+    if ($q !== '') {
+        $query->where(function ($sub) use ($q) {
+            $sub->where('name', 'like', "%{$q}%")
+                ->orWhere('email', 'like', "%{$q}%")
+                ->orWhere('username', 'like', "%{$q}%")
+                ->orWhere('roles', 'like', "%{$q}%")
+                ->orWhere('phone', 'like', "%{$q}%");
+        });
     }
+
+    // Trả về cấu trúc paginator: data, current_page, last_page, total, per_page...
+    return response()->json(
+        $query->paginate($perPage)->appends($request->query())
+    );
+}
 
     // ✅ Lấy chi tiết user theo id
     public function show($id)

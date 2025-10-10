@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
+import { Editor } from '@tinymce/tinymce-react';
+
 
 const API_BASE = "http://127.0.0.1:8000/api"; // BE dùng /api
 
@@ -310,16 +312,37 @@ export default function EditProduct() {
               </div>
 
               <div className="admin-form-field">
-                <Label>Mo ta</Label>
-                <textarea
-                  name="description"
-                  rows={5}
-                  value={form.description}
-                  onChange={onChange}
-                  className="admin-form-control admin-form-textarea"
+                <Label>Mô tả</Label>
+
+                <Editor
+                  // nếu chuyển giữa các sản phẩm, key giúp Editor remount & nhận đúng value
+                  key={id}
+                  apiKey="wytgyqmbl6rj0c9rw03s5uep2xrd9iit95fmkka5zqb42det"                 // dùng CDN của Tiny (đủ xài dev). Có key thì thay vào.
+                  value={form.description || ""}      // bám state hiện có
+                  onEditorChange={(html) =>
+                    setForm((s) => ({ ...s, description: html }))
+                  }
+                  init={{
+                    height: 360,
+                    menubar: false,
+                    plugins: [
+                      "advlist autolink lists link image charmap preview anchor",
+                      "searchreplace visualblocks code fullscreen",
+                      "insertdatetime media table code help wordcount"
+                    ],
+                    toolbar:
+                      "undo redo | formatselect | " +
+                      "bold italic underline forecolor backcolor | alignleft aligncenter " +
+                      "alignright alignjustify | bullist numlist outdent indent | " +
+                      "table link image media | removeformat | code preview",
+                    content_style:
+                      "body { font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; font-size:14px }",
+                  }}
                 />
+
                 <Err name="description" />
               </div>
+
             </div>
           </section>
 

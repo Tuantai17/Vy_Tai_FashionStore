@@ -8,11 +8,6 @@ use App\Models\Order;
 use App\Http\Controllers\Api\MomoController;
 use App\Models\Payment;
 
-
-
-use App\Http\Controllers\Api\NewsController;
-
-
 use App\Http\Controllers\Api\{
     ProductController,
     CategoryController,
@@ -23,13 +18,6 @@ use App\Http\Controllers\Api\{
     ReviewController
 };
 
-
-
-
-
-
-Route::get('/news', [NewsController::class, 'index']);
-Route::get('/news/{slug}', [NewsController::class, 'show']);
 
 // //momo
 // Route::post('/payments/momo/create', [MomoController::class, 'create']);  // tạo lệnh thanh toán
@@ -98,6 +86,8 @@ Route::delete('/reviews/{id}', [ReviewController::class, 'destroy'])->middleware
 Route::get('/products',      [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/categories/{id}/products', [ProductController::class, 'byCategory'])->whereNumber('id');
+// ✅ Danh sách sản phẩm theo danh mục (public)
+Route::get('/categories/{id}/products', [ProductController::class, 'byCategory']);
 
 Route::get('/admin/products/trash', [ProductController::class, 'trash']);
 Route::post('/admin/products/{id}/restore', [ProductController::class, 'restore']);
@@ -106,9 +96,17 @@ Route::post('/admin/products/{id}/force-delete', [ProductController::class, 'for
 // ===== Categories (CRUD) =====
 Route::get('/categories',          [CategoryController::class, 'index']);
 Route::get('/categories/{id}',     [CategoryController::class, 'show']);
-Route::post('/categories',         [CategoryController::class, 'store']);
-Route::put('/categories/{id}',     [CategoryController::class, 'update']);
-Route::delete('/categories/{id}',  [CategoryController::class, 'destroy']);
+Route::put('/admin/categories/{id}', [CategoryController::class, 'update']);
+
+Route::prefix('admin')->group(function () {
+    Route::get('/categories',                   [CategoryController::class, 'adminIndex']);
+    Route::post('/categories',         [CategoryController::class, 'store']);
+    Route::put('/categories/{id}',     [CategoryController::class, 'update']);
+    Route::get('/categories/trash',             [CategoryController::class, 'trash']);
+    Route::post('/categories/{id}/restore',     [CategoryController::class, 'restore']);
+    Route::post('/categories/{id}/force-delete',[CategoryController::class, 'forceDestroy']);
+    Route::delete('/categories/{id}',           [CategoryController::class, 'destroy']); // soft delete
+});
 
 // ===== Brands =====
 Route::get('/brands', [BrandController::class, 'index']);
@@ -148,13 +146,19 @@ Route::prefix('admin')->group(function () {
     Route::delete('/products/{id}',  [ProductController::class, 'destroy']);
 });
 
+// Route::get('/admin/users', [UserController::class, 'index']);
+
+
 // ===== Users (Admin quản lý user) — BẠN ĐANG THIẾU NHÓM NÀY =====
-Route::middleware('auth:sanctum')->group(function () {
+// ===== Admin: Users =====
+Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('/users',           [UserController::class, 'index']);
     Route::get('/users/{id}',      [UserController::class, 'show']);
     Route::post('/users',          [UserController::class, 'store']);
     Route::put('/users/{id}',      [UserController::class, 'update']);
     Route::delete('/users/{id}',   [UserController::class, 'destroy']);
-    Route::post('/users/{id}/lock', [UserController::class, 'lock']);
+    Route::post('/users/{id}/lock',   [UserController::class, 'lock']);
     Route::post('/users/{id}/unlock', [UserController::class, 'unlock']);
 });
+
+
