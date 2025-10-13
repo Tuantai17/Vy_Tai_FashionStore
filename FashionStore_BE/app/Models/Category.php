@@ -25,6 +25,10 @@ class Category extends Model
 
     protected $appends = ['image_url'];
 
+   public function products()
+    {
+        return $this->hasMany(Product::class, 'category_id');
+    }
     public function getImageUrlAttribute()
     {
         // if (!$this->image) return null;

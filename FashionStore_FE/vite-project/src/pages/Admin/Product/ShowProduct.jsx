@@ -1,6 +1,7 @@
 // src/pages/Admin/Product/ShowProduct.jsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import DOMPurify from "dompurify";
 
 const API_BASE = "http://127.0.0.1:8000/api";
 const APP_BASE = API_BASE.replace(/\/api$/, "");
@@ -46,6 +47,11 @@ export default function ShowProduct() {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [showReviews, setShowReviews] = useState(false);
+
+  const safeDesc = DOMPurify.sanitize(product?.description || "", {
+    USE_PROFILES: { html: true },
+  });
 
   useEffect(() => {
     const ac = new AbortController();
@@ -131,19 +137,6 @@ export default function ShowProduct() {
           >
             ← Quay lại
           </button>
-          <button
-            onClick={() => navigate(`/admin/products/${product.id}/edit`)}
-            style={{
-              padding: "8px 14px",
-              borderRadius: 10,
-              border: "none",
-              background: "linear-gradient(90deg,#16a34a,#22c55e)",
-              color: "#fff",
-              fontWeight: 700,
-            }}
-          >
-            Sửa
-          </button>
         </div>
       </div>
 
@@ -162,6 +155,45 @@ export default function ShowProduct() {
               border: "1px solid #e5e7eb",
             }}
           />
+
+          {/* Nút dưới ảnh */}
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button
+              onClick={() => setShowReviews((s) => !s)}
+              style={{
+                flex: 1,
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: "1px solid #e5e7eb",
+                background: showReviews ? "linear-gradient(90deg,#16a34a,#22c55e)" : "#f9fafb",
+                color: showReviews ? "#fff" : "#111827",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {showReviews ? "Ẩn đánh giá" : "Đánh giá"} ({reviews.length})
+            </button>
+
+            <button
+              onClick={() => navigate(`/admin/categories/${product.category_id}`)}
+              style={{
+                flex: 1,
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: "1px solid #d1fae5",
+                background: "#f0fdf4",
+                color: "#065f46",
+                fontWeight: 700,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+              title={product.category_name || "Danh mục"}
+            >
+              Danh mục: {product.category_name || "-"}
+            </button>
+          </div>
         </div>
 
         <div style={{ display: "grid", gap: 8, color: "#111827" }}>
@@ -170,58 +202,61 @@ export default function ShowProduct() {
           <Row label="Danh mục">{product.category_name || "-"}</Row>
           <Row label="Thương hiệu">{product.brand_name || "-"}</Row>
 
-          
           <Row label="Giá gốc">{product.price_root ? `${VND.format(product.price_root)} đ` : "0 đ"}</Row>
           <Row label="Giá sale">{product.price_sale ? `${VND.format(product.price_sale)} đ` : "0 đ"}</Row>
           <Row label="Tồn kho">{product.qty ?? 0}</Row>
           <Row label="Trạng thái">{Number(product.status) === 1 ? "Hoạt động" : "Ẩn"}</Row>
           <Row label="Mô tả">
-            <div style={{ whiteSpace: "pre-line", color: "#374151" }}>
-              {product.description || "Chưa có mô tả."}
-            </div>
+            <div
+              className="admin-rich"
+              dangerouslySetInnerHTML={{
+                __html: safeDesc || "<em>Chưa có mô tả.</em>",
+              }}
+            />
           </Row>
-          
         </div>
       </div>
 
-      {/* Đánh giá */}
-      <div style={{ marginTop: 28 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 12, color: "#111827" }}>
-          Đánh giá của khách ({reviews.length})
-        </h2>
+      {/* Đánh giá (toggle) */}
+      {showReviews && (
+        <div style={{ marginTop: 28 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 12, color: "#111827" }}>
+            Đánh giá của khách ({reviews.length})
+          </h2>
 
-        {reviews.length === 0 ? (
-          <div style={{ color: "#6b7280" }}>Chưa có đánh giá.</div>
-        ) : (
-          <div style={{ display: "grid", gap: 12 }}>
-            {reviews.map((r, i) => (
-              <div
-                key={r.id || i}
-                style={{
-                  background: "#fff",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 10,
-                  padding: 12,
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                  <div style={{ fontWeight: 700 }}>{r.user?.name || r.author_name || "Ẩn danh"}</div>
-                  <div style={{ color: "#f59e0b" }}>
-                    {"★".repeat(r.rating || 0)}
-                    {"☆".repeat(Math.max(0, 5 - (r.rating || 0)))}
+          {reviews.length === 0 ? (
+            <div style={{ color: "#6b7280" }}>Chưa có đánh giá.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 12 }}>
+              {reviews.map((r, i) => (
+                <div
+                  key={r.id || i}
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 10,
+                    padding: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ fontWeight: 700 }}>{r.user?.name || r.author_name || "Ẩn danh"}</div>
+                    <div style={{ color: "#f59e0b" }}>
+                      {"★".repeat(r.rating || 0)}
+                      {"☆".repeat(Math.max(0, 5 - (r.rating || 0)))}
+                    </div>
                   </div>
+                  <div style={{ color: "#374151", lineHeight: 1.6 }}>{r.comment}</div>
+                  {r.created_at && (
+                    <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>
+                      {new Date(r.created_at).toLocaleString("vi-VN")}
+                    </div>
+                  )}
                 </div>
-                <div style={{ color: "#374151", lineHeight: 1.6 }}>{r.comment}</div>
-                {r.created_at && (
-                  <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>
-                    {new Date(r.created_at).toLocaleString("vi-VN")}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

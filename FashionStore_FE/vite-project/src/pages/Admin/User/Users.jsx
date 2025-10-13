@@ -10,7 +10,7 @@ export default function Users() {
   const [loading, setLoading] = useState(true);
   const [err, setErr]         = useState("");
 
-  // phân trang
+  // pagination
   const [page, setPage]       = useState(1);
   const [lastPage, setLast]   = useState(1);
   const [total, setTotal]     = useState(0);
@@ -35,13 +35,12 @@ export default function Users() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
-        // paginator của Laravel
         const list = Array.isArray(data) ? data : (data.data ?? []);
         setUsers(list);
         setLast(Number(data.last_page ?? 1));
         setTotal(Number(data.total ?? list.length));
       } catch (e) {
-        if (e.name !== "AbortError") setErr("Không tải được danh sách người dùng.");
+        if (e.name !== "AbortError") setErr("Failed to load users.");
       } finally {
         setLoading(false);
       }
@@ -49,13 +48,13 @@ export default function Users() {
     return () => ac.abort();
   }, [page, q, token]);
 
-  // khi đổi từ khóa, về trang 1
+  // when keyword changes, go back to page 1
   useEffect(() => { setPage(1); }, [q]);
 
-  // filter client phụ (tuỳ chọn; có thể bỏ vì đã search ở server)
+  // client filter (unchanged)
   const filtered = useMemo(() => users, [users]);
 
-  // UI: nút phân trang giống Product
+  // ===== PAGINATION (LOGIC UNCHANGED) =====
   const gotoPage = (p) => {
     if (p < 1 || p > lastPage || p === page) return;
     setPage(p);
@@ -75,98 +74,185 @@ export default function Users() {
     return pages;
   }, [page, lastPage]);
 
+  // ===== UI THEME (same as Inventory/Orders) =====
+  const colors = {
+    text: "#ffffff",
+    border: "#ffffff",
+    bg: "rgba(255,255,255,0.1)",
+    bgDisabled: "rgba(255,255,255,0.2)",
+    primary: "#00bcd4",
+  };
+  const btnBase = (disabled) => ({
+    padding: "6px 10px",
+    borderRadius: 8,
+    border: `1px solid ${colors.border}`,
+    background: disabled ? colors.bgDisabled : colors.bg,
+    color: colors.text,
+    cursor: disabled ? "not-allowed" : "pointer",
+  });
+  const btnNumber = (active) => ({
+    padding: "6px 10px",
+    borderRadius: 8,
+    border: `1px solid ${active ? colors.primary : colors.border}`,
+    background: active ? colors.primary : colors.bg,
+    color: active ? "#000" : colors.text,
+    fontWeight: active ? 800 : 600,
+    textDecoration: active ? "underline" : "none",
+    cursor: "pointer",
+  });
+
   const Badge = ({ active }) => (
-    <span style={{
-      display:"inline-block", padding:"2px 8px", borderRadius:999, fontSize:12, fontWeight:700,
-      background: active ? "#ecfdf5" : "#f3f4f6",
-      color: active ? "#065f46" : "#374151",
-      border:`1px solid ${active ? "#a7f3d0" : "#e5e7eb"}`
-    }}>{active ? "Hoạt động" : "Khoá"}</span>
+    <span
+      style={{
+        display: "inline-block",
+        padding: "2px 8px",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 700,
+        background: active ? "#ecfdf5" : "#f3f4f6",
+        color: active ? "#065f46" : "#374151",
+        border: `1px solid ${active ? "#a7f3d0" : "#e5e7eb"}`,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {active ? "Active" : "Locked"}
+    </span>
   );
 
   return (
-    <section style={{ padding:20, background:"rgba(255,255,255,0.08)", backdropFilter:"blur(8px)", borderRadius:16, boxShadow:"0 8px 20px rgba(3,10,27,.25)" }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
-        <h1 style={{ fontSize:24, fontWeight:800, color:"#fff", margin:0 }}>Users</h1>
+    <div
+      style={{
+        maxWidth: 1400,
+        width: "min(96vw, 1400px)",
+        margin: "24px auto",
+        padding: 20,
+        color: "#fff",
+      }}
+    >
+      {/* HEADER + SEARCH */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <h2 style={{ margin: 0 }}>User Management </h2>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Tìm theo tên, email, role…"
-          style={{ height:38, padding:"0 12px", borderRadius:10, border:"1px solid rgba(255,255,255,.25)", background:"rgba(255,255,255,0.2)", color:"#fff", minWidth:240, outline:"none" }}
+          placeholder="Search by name, email, role…"
+          style={{
+            flex: 1,
+            maxWidth: 420,
+            height: 40,
+            padding: "0 14px",
+            borderRadius: 10,
+            border: "1px solid #ccc",
+            background: "rgba(255,255,255,0.1)",
+            color: "#fff",
+            outline: "none",
+          }}
         />
       </div>
 
-      {err && <p style={{ color:"#ef4444", fontWeight:600 }}>{err}</p>}
-      {loading && <p style={{ color:"#ddd" }}>Đang tải dữ liệu…</p>}
+      {/* MAIN WRAPPER (dark) + FIXED PAGINATION */}
+      <div
+        style={{
+          position: "relative",
+          minHeight: "76vh",
+          border: "1px solid #fff",
+          borderRadius: 10,
+          overflow: "hidden",
+          paddingBottom: "80px",
+          background: "rgba(255,255,255,0.05)",
+        }}
+      >
+        {err && <p style={{ padding: 12, color: "#ffb4b4" }}>{err}</p>}
+        {loading && <p style={{ padding: 12, color: "#ddd" }}>Loading…</p>}
 
-      {!loading && !err && (
-        <>
-          <div style={{ overflowX:"auto", borderRadius:12, background:"rgba(255,255,255,0.92)", boxShadow:"0 4px 20px rgba(0,0,0,0.15)" }}>
-            <table style={{ width:"100%", borderCollapse:"collapse", borderRadius:12, overflow:"hidden", fontSize:14 }}>
-              <thead>
-                <tr style={{ background:"linear-gradient(90deg,#fff,#f8fafc)", color:"#1f2937", fontWeight:700, borderBottom:"2px solid #e5e7eb" }}>
-                  <th style={{ textAlign:"left", padding:"10px 12px" }}>ID</th>
-                  <th style={{ textAlign:"left", padding:"10px 12px" }}>Tên</th>
-                  <th style={{ textAlign:"left", padding:"10px 12px" }}>Email</th>
-                  <th style={{ textAlign:"left", padding:"10px 12px" }}>Username</th>
-                  <th style={{ textAlign:"left", padding:"10px 12px" }}>Vai trò</th>
-                  <th style={{ textAlign:"center", padding:"10px 12px" }}>Trạng thái</th>
+        {!loading && !err && (
+          <>
+            <table style={{ width: "100%", borderCollapse: "collapse", color: "#fff" }}>
+              <thead style={{ background: "rgba(255,255,255,0.1)" }}>
+                <tr>
+                  <th style={{ padding: 10, textAlign: "left", borderBottom: "1px solid #fff" }}>ID</th>
+                  <th style={{ padding: 10, textAlign: "left", borderBottom: "1px solid #fff" }}>Name</th>
+                  <th style={{ padding: 10, textAlign: "left", borderBottom: "1px solid #fff" }}>Email</th>
+                  <th style={{ padding: 10, textAlign: "left", borderBottom: "1px solid #fff" }}>Username</th>
+                  <th style={{ padding: 10, textAlign: "left", borderBottom: "1px solid #fff" }}>Role</th>
+                  <th style={{ padding: 10, textAlign: "center", borderBottom: "1px solid #fff" }}>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((u, i) => (
-                  <tr key={u.id}
-                      style={{
-                        background: i%2===0 ? "rgba(255,255,255,0.98)" : "rgba(248,250,252,0.95)",
-                        borderTop:"1px solid #eee", transition:"background .2s ease"
-                      }}
-                      onMouseEnter={(e)=>e.currentTarget.style.background="#f1f5f9"}
-                      onMouseLeave={(e)=>e.currentTarget.style.background = i%2===0 ? "rgba(255,255,255,0.98)" : "rgba(248,250,252,0.95)"}
-                  >
-                    <td style={{ padding:"10px 12px" }}>{u.id}</td>
-                    <td style={{ padding:"10px 12px", fontWeight:600 }}>{u.name}</td>
-                    <td style={{ padding:"10px 12px", color:"#475569" }}>{u.email}</td>
-                    <td style={{ padding:"10px 12px" }}>{u.username}</td>
-                    <td style={{ padding:"10px 12px", textTransform:"capitalize" }}>{u.roles}</td>
-                    <td style={{ padding:"10px 12px", textAlign:"center" }}>
+                {filtered.map((u) => (
+                  <tr key={u.id} style={{ borderTop: "1px solid #fff" }}>
+                    <td style={{ padding: 10 }}>{u.id}</td>
+                    <td style={{ padding: 10, fontWeight: 700 }}>{u.name}</td>
+                    <td style={{ padding: 10, color: "#ccc" }}>{u.email}</td>
+                    <td style={{ padding: 10 }}>{u.username}</td>
+                    <td style={{ padding: 10, textTransform: "capitalize" }}>{u.roles}</td>
+                    <td style={{ padding: 10, textAlign: "center" }}>
                       <Badge active={u.status === 1} />
                     </td>
                   </tr>
                 ))}
-                {!filtered.length && (
-                  <tr><td colSpan={6} style={{ padding:20, textAlign:"center", color:"#6b7280" }}>Không có người dùng nào</td></tr>
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: 16, textAlign: "center", color: "#ccc" }}>
+                      No users found
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
-          </div>
 
-          {/* PHÂN TRANG */}
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, marginTop:14, background:"rgba(255,255,255,0.9)", borderRadius:10, padding:"10px 12px", color:"#111827" }}>
-            <div style={{ fontSize:14 }}>Trang <b>{page}</b> / <b>{lastPage}</b> — Tổng: <b>{total}</b></div>
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-              <button onClick={()=>gotoPage(1)}            disabled={page<=1}        style={btn(page<=1)}>« Đầu</button>
-              <button onClick={()=>gotoPage(page-1)}       disabled={page<=1}        style={btn(page<=1)}>‹ Trước</button>
-              {pageNumbers.map(n => (
-                <button key={n} onClick={()=>gotoPage(n)} style={numBtn(n===page)}>{n}</button>
-              ))}
-              <button onClick={()=>gotoPage(page+1)}       disabled={page>=lastPage} style={btn(page>=lastPage)}>Sau ›</button>
-              <button onClick={()=>gotoPage(lastPage)}     disabled={page>=lastPage} style={btn(page>=lastPage)}>Cuối »</button>
-            </div>
-          </div>
-        </>
-      )}
-    </section>
+            {/* FIXED PAGINATION (bottom-right) */}
+            {lastPage > 1 && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 16,
+                  right: 16,
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                  background: "rgba(0,0,0,0.6)",
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #fff",
+                }}
+              >
+                <button style={btnBase(page <= 1)} disabled={page <= 1} onClick={() => gotoPage(1)}>
+                  « First
+                </button>
+                <button style={btnBase(page <= 1)} disabled={page <= 1} onClick={() => gotoPage(page - 1)}>
+                  ‹ Previous
+                </button>
+
+                {pageNumbers.map((n) => (
+                  <button key={n} style={btnNumber(n === page)} onClick={() => gotoPage(n)}>
+                    {n}
+                  </button>
+                ))}
+
+                <button
+                  style={btnBase(page >= lastPage)}
+                  disabled={page >= lastPage}
+                  onClick={() => gotoPage(page + 1)}
+                >
+                  Next ›
+                </button>
+                <button
+                  style={btnBase(page >= lastPage)}
+                  disabled={page >= lastPage}
+                  onClick={() => gotoPage(lastPage)}
+                >
+                  Last »
+                </button>
+
+                <div style={{ color: "#fff", fontSize: 14 }}>
+                  Pages <b>{page}</b>/<b>{lastPage}</b> — Total: <b>{total}</b>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }
-
-const btn = (disabled) => ({
-  padding:"6px 10px", borderRadius:8, border:"1px solid #e5e7eb",
-  background: disabled ? "#f3f4f6" : "#fff",
-  cursor: disabled ? "not-allowed" : "pointer", color:"#111827",
-});
-const numBtn = (active) => ({
-  padding:"6px 10px", borderRadius:8,
-  border: active ? "1px solid #111827" : "1px solid #e5e7eb",
-  background:"#fff", color:"#111827", fontWeight: active ? 800 : 600,
-  textDecoration: active ? "underline" : "none",
-});

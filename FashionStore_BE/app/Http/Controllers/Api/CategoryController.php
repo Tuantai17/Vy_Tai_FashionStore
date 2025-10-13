@@ -116,8 +116,12 @@ class CategoryController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
+        $cat->product_count = \App\Models\Product::where('category_id', $cat->id)->count();
+
         // nếu muốn chắc chắn có image_url khi select thủ công:
         $cat->setAppends(['image_url']);
+
+
 
         return response()->json($cat);
     }

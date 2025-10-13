@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import { Editor } from '@tinymce/tinymce-react';
 
 
+
 const API_BASE = "http://127.0.0.1:8000/api"; // BE dùng /api
 
 export default function EditProduct() {

@@ -104,7 +104,18 @@ class ProductController extends Controller
     {
         $query = Product::with(['brand:id,name', 'category:id,name'])
             ->where('category_id', $id)
-            ->select(['id', 'name', 'brand_id', 'category_id', 'price_sale as price', 'thumbnail'])
+            ->select([
+                'id',
+                'name',
+                'slug',
+                'brand_id',
+                'category_id',
+                'price_root',
+                'price_sale as price',
+                'qty',
+                'status',
+                'thumbnail',
+            ])
             ->latest('id');
 
         $perPage = (int) $request->query('per_page', 12);
@@ -156,7 +167,7 @@ class ProductController extends Controller
             $p->detail = mb_convert_encoding($p->detail, 'UTF-8', 'auto');
         }
 
-        $payload = $p->makeHidden(['brand', 'brand_id', 'category', 'category_id'])
+        $payload = $p->makeHidden(['brand', 'brand_id', 'category'])
             ->append(['thumbnail_url', 'brand_name', 'category_name']);
 
         // ✅ Không escape Unicode/Slash để tránh 500 khi có HTML & ký tự tiếng Việt

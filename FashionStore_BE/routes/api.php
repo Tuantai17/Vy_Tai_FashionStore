@@ -8,6 +8,11 @@ use App\Models\Order;
 use App\Http\Controllers\Api\MomoController;
 use App\Models\Payment;
 
+use App\Http\Controllers\Api\ProductImportController;
+use App\Http\Controllers\Api\InventoryController;
+
+// use App\Http\Controllers\Api\WishlistController;
+
 use App\Http\Controllers\Api\{
     ProductController,
     CategoryController,
@@ -17,8 +22,19 @@ use App\Http\Controllers\Api\{
     UserController,
     ReviewController
 };
+// import products from CSV
 
+Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
+    Route::post('/products/import', [ProductImportController::class, 'import']);
+    Route::get('/products/export', [ProductImportController::class, 'export']);
 
+    // Inventory
+    Route::get('/inventory',            [InventoryController::class, 'index']);
+    Route::post('/inventory/adjust', [InventoryController::class, 'adjust']);
+    Route::get('/inventory/{product}/moves', [InventoryController::class, 'moves']);
+});
+
+///--------------------------------------
 // //momo
 // Route::post('/payments/momo/create', [MomoController::class, 'create']);  // tạo lệnh thanh toán
 // Route::post('/payments/momo/ipn',    [MomoController::class, 'ipn']);     // MoMo gọi về (server-to-server)
@@ -82,12 +98,19 @@ Route::post('/products/{id}/reviews', [ReviewController::class, 'store'])->middl
 Route::put('/reviews/{id}', [ReviewController::class, 'update'])->middleware('auth:sanctum');
 Route::delete('/reviews/{id}', [ReviewController::class, 'destroy'])->middleware('auth:sanctum');
 
+// Route::middleware('auth:sanctum')->group(function () {
+//     Route::get('/wishlist', [WishlistController::class, 'index']);
+//     Route::post('/wishlist/toggle', [WishlistController::class, 'toggle']);
+// });
+
 // ===== Products =====
 Route::get('/products',      [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/categories/{id}/products', [ProductController::class, 'byCategory'])->whereNumber('id');
 // ✅ Danh sách sản phẩm theo danh mục (public)
 Route::get('/categories/{id}/products', [ProductController::class, 'byCategory']);
+
+
 
 Route::get('/admin/products/trash', [ProductController::class, 'trash']);
 Route::post('/admin/products/{id}/restore', [ProductController::class, 'restore']);
@@ -99,13 +122,23 @@ Route::get('/categories/{id}',     [CategoryController::class, 'show']);
 Route::put('/admin/categories/{id}', [CategoryController::class, 'update']);
 
 Route::prefix('admin')->group(function () {
-    Route::get('/categories',                   [CategoryController::class, 'adminIndex']);
-    Route::post('/categories',         [CategoryController::class, 'store']);
-    Route::put('/categories/{id}',     [CategoryController::class, 'update']);
-    Route::get('/categories/trash',             [CategoryController::class, 'trash']);
-    Route::post('/categories/{id}/restore',     [CategoryController::class, 'restore']);
-    Route::post('/categories/{id}/force-delete',[CategoryController::class, 'forceDestroy']);
-    Route::delete('/categories/{id}',           [CategoryController::class, 'destroy']); // soft delete
+    // ✅ liệt kê đang hoạt động (paginator)
+    Route::get('/categories', [CategoryController::class, 'adminIndex']);
+
+    // ✅ TRASH trước {id} để không bị nuốt
+    Route::get('/categories/trash', [CategoryController::class, 'trash']);
+
+    // ✅ CRUD
+    Route::post('/categories',        [CategoryController::class, 'store']);
+    Route::put('/categories/{id}',    [CategoryController::class, 'update'])->whereNumber('id');
+    Route::delete('/categories/{id}', [CategoryController::class, 'destroy'])->whereNumber('id');
+
+    // ✅ show (nếu cần cho admin)
+    Route::get('/categories/{id}',    [CategoryController::class, 'show'])->whereNumber('id');
+
+    // ✅ restore/force-delete
+    Route::post('/categories/{id}/restore',      [CategoryController::class, 'restore'])->whereNumber('id');
+    Route::post('/categories/{id}/force-delete', [CategoryController::class, 'forceDestroy'])->whereNumber('id');
 });
 
 // ===== Brands =====
@@ -160,5 +193,3 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::post('/users/{id}/lock',   [UserController::class, 'lock']);
     Route::post('/users/{id}/unlock', [UserController::class, 'unlock']);
 });
-
-

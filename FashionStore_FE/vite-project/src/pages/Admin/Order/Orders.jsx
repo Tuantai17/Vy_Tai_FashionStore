@@ -4,13 +4,13 @@ import { useNavigate } from "react-router-dom";
 const API_BASE = "http://127.0.0.1:8000/api";
 const VND = new Intl.NumberFormat("vi-VN");
 
-// ===== 5 trạng thái (không đổi)
+// ===== 5 ORDER STATUS STEPS =====
 export const STEPS = [
-  { key: "pending",   label: "Chờ xác nhận" },
-  { key: "confirmed", label: "Đã xác nhận" },
-  { key: "ready",     label: "Chờ vận chuyển" },
-  { key: "shipping",  label: "Đang giao" },
-  { key: "delivered", label: "Giao thành công" },
+  { key: "pending",   label: "Pending Confirmation" },
+  { key: "confirmed", label: "Confirmed" },
+  { key: "ready",     label: "Ready to Ship" },
+  { key: "shipping",  label: "Shipping" },
+  { key: "delivered", label: "Delivered" },
 ];
 
 const normalizeStatusKey = (s) => {
@@ -28,6 +28,7 @@ const normalizeStatusKey = (s) => {
 };
 
 const stepIndex = (key) => Math.max(0, STEPS.findIndex((s) => s.key === key));
+
 const authHeaders = () => {
   const h = { Accept: "application/json", "Content-Type": "application/json" };
   const token = localStorage.getItem("token");
@@ -38,19 +39,18 @@ const authHeaders = () => {
 export default function Orders() {
   const navigate = useNavigate();
 
-  const [orders, setOrders]   = useState([]);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [err, setErr]         = useState("");
-  const [search, setSearch]   = useState("");
+  const [err, setErr] = useState("");
+  const [search, setSearch] = useState("");
   const [savingId, setSavingId] = useState(null);
 
-  // ===== PHÂN TRANG (giống Products) =====
-  const [page, setPage]       = useState(1);
+  const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
-  const [total, setTotal]     = useState(0);
+  const [total, setTotal] = useState(0);
   const perPage = 10;
 
-  // load list (theo search + page)
+  // ===== FETCH ORDERS =====
   useEffect(() => {
     let ignore = false;
     (async () => {
@@ -68,16 +68,15 @@ export default function Orders() {
 
         if (ignore) return;
 
-        // Hỗ trợ cả 2 kiểu: mảng thuần hoặc paginator
         let list, lp = 1, tt = 0;
         if (Array.isArray(data)) {
           list = data;
-          lp   = 1;
-          tt   = data.length;
+          lp = 1;
+          tt = data.length;
         } else {
           list = data.data ?? [];
-          lp   = Number(data.last_page ?? 1);
-          tt   = Number(data.total ?? list.length);
+          lp = Number(data.last_page ?? 1);
+          tt = Number(data.total ?? list.length);
         }
 
         setOrders(
@@ -90,7 +89,7 @@ export default function Orders() {
         setTotal(tt);
       } catch (e) {
         if (!ignore) {
-          setErr("Không tải được danh sách đơn hàng.");
+          setErr("Failed to load orders.");
           console.error(e);
         }
       } finally {
@@ -100,10 +99,9 @@ export default function Orders() {
     return () => { ignore = true; };
   }, [search, page]);
 
-  // khi đổi keyword -> về trang 1
   useEffect(() => { setPage(1); }, [search]);
 
-  // cập nhật step (khóa nếu canceled)
+  // ===== UPDATE ORDER STATUS =====
   const updateStatus = async (order, newKey) => {
     if (order.statusKey === "canceled") return;
     const oldKey = order.statusKey;
@@ -148,18 +146,19 @@ export default function Orders() {
     setSavingId(null);
     if (!ok) {
       setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, statusKey: oldKey } : o)));
-      alert(`Cập nhật trạng thái thất bại. Vui lòng thử lại.\n(last=${lastStatus} ${lastText || ""})`);
+      alert(`Failed to update order status.\n(last=${lastStatus} ${lastText || ""})`);
     }
   };
 
+  // ===== STATUS BADGE COLORS =====
   const badgeStyle = (key) => {
     const i = stepIndex(key);
     const palette = [
-      { bg: "#fff7ed", fg: "#9a3412", br: "#fed7aa" }, // pending
-      { bg: "#eef2ff", fg: "#3730a3", br: "#c7d2fe" }, // confirmed
-      { bg: "#f0f9ff", fg: "#075985", br: "#bae6fd" }, // ready
-      { bg: "#ecfeff", fg: "#155e75", br: "#a5f3fc" }, // shipping
-      { bg: "#ecfdf5", fg: "#065f46", br: "#a7f3d0" }, // delivered
+      { bg: "#fff7ed", fg: "#9a3412", br: "#fed7aa" },
+      { bg: "#eef2ff", fg: "#3730a3", br: "#c7d2fe" },
+      { bg: "#f0f9ff", fg: "#075985", br: "#bae6fd" },
+      { bg: "#ecfeff", fg: "#155e75", br: "#a5f3fc" },
+      { bg: "#ecfdf5", fg: "#065f46", br: "#a7f3d0" },
     ][i] || { bg: "#f3f4f6", fg: "#374151", br: "#e5e7eb" };
     return {
       background: palette.bg,
@@ -174,7 +173,7 @@ export default function Orders() {
     };
   };
 
-  // ===== phân trang: helpers =====
+  // ===== PAGINATION =====
   const gotoPage = (p) => {
     if (p < 1 || p > lastPage || p === page) return;
     setPage(p);
@@ -187,7 +186,7 @@ export default function Orders() {
       for (let i = 1; i <= lastPage; i++) pages.push(i);
     } else {
       let start = Math.max(1, page - 3);
-      let end   = Math.min(lastPage, page + 3);
+      let end = Math.min(lastPage, page + 3);
       if (page <= 4) { start = 1; end = 7; }
       else if (page >= lastPage - 3) { start = lastPage - 6; end = lastPage; }
       for (let i = start; i <= end; i++) pages.push(i);
@@ -195,105 +194,135 @@ export default function Orders() {
     return pages;
   }, [page, lastPage]);
 
+  const colors = {
+    text: "#ffffff",
+    border: "#ffffff",
+    bg: "rgba(255,255,255,0.1)",
+    bgDisabled: "rgba(255,255,255,0.2)",
+    primary: "#00bcd4",
+  };
+  const btnBase = (disabled) => ({
+    padding: "6px 10px",
+    borderRadius: 8,
+    border: `1px solid ${colors.border}`,
+    background: disabled ? colors.bgDisabled : colors.bg,
+    color: colors.text,
+    cursor: disabled ? "not-allowed" : "pointer",
+  });
+  const btnNumber = (active) => ({
+    padding: "6px 10px",
+    borderRadius: 8,
+    border: `1px solid ${active ? colors.primary : colors.border}`,
+    background: active ? colors.primary : colors.bg,
+    color: active ? "#000" : colors.text,
+    fontWeight: active ? 800 : 600,
+    textDecoration: active ? "underline" : "none",
+    cursor: "pointer",
+  });
+
   return (
-    <section
+    <div
       style={{
+        maxWidth: 1400,
+        width: "min(96vw, 1400px)",
+        margin: "24px auto",
         padding: 20,
-        background: "rgba(255,255,255,0.08)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-        borderRadius: 16,
-        boxShadow: "0 8px 20px rgba(3,10,27,.25)",
+        color: "#fff",
       }}
     >
       {/* HEADER */}
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-        <h1 style={{ fontSize:24, fontWeight:800, color:"#fff", letterSpacing:.3, textShadow:"0 1px 2px rgba(0,0,0,.4)" }}>
-          Quản lý đơn hàng
-        </h1>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 12 }}>
+        <h2 style={{ margin: 0 }}>Order Management</h2>
       </div>
 
-      {/* SEARCH */}
-      <div style={{ display:"flex", gap:8, marginBottom:14, alignItems:"center" }}>
+      {/* SEARCH BAR */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Tìm theo mã đơn / tên / email / sđt"
+          placeholder="Search by order ID, name, email, or phone..."
           style={{
-            flex:1, height:38, padding:"0 12px",
-            border:"1px solid rgba(255,255,255,.25)", borderRadius:10,
-            background:"rgba(255,255,255,0.2)", color:"#fff",
-            backdropFilter:"blur(6px)", outline:"none",
+            flex: 1,
+            padding: 8,
+            borderRadius: 8,
+            border: "1px solid #ccc",
+            background: "rgba(255,255,255,0.1)",
+            color: "#fff",
           }}
         />
         {!!search && (
           <button
             onClick={() => setSearch("")}
             style={{
-              padding:"8px 12px", borderRadius:10, border:"none",
-              background:"linear-gradient(90deg,#64748b,#94a3b8)",
-              color:"#fff", cursor:"pointer", fontWeight:600,
-              boxShadow:"0 3px 8px rgba(100,116,139,.35)",
+              padding: "8px 12px",
+              background: colors.primary,
+              color: "#000",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontWeight: 700,
             }}
           >
-            Xóa tìm
+            Clear
           </button>
         )}
       </div>
 
-      {loading && <p style={{ color: "#ddd" }}>Đang tải dữ liệu…</p>}
-      {err && <p style={{ color: "#ef4444", fontWeight: 600 }}>{err}</p>}
+      {/* MAIN TABLE + PAGINATION */}
+      <div
+        style={{
+          position: "relative",
+          minHeight: "70vh",
+          border: "1px solid #fff",
+          borderRadius: 8,
+          overflow: "hidden",
+          paddingBottom: "60px",
+          background: "rgba(255,255,255,0.05)",
+        }}
+      >
+        {loading && <p style={{ padding: 12, color: "#ddd" }}>Loading data…</p>}
+        {err && <p style={{ padding: 12, color: "#ffb4b4" }}>{err}</p>}
 
-      {!loading && !err && (
-        <>
-          {/* TABLE */}
-          <div style={{ overflowX:"auto", borderRadius:12, background:"rgba(255,255,255,0.92)", boxShadow:"0 4px 20px rgba(0,0,0,0.15)" }}>
-            <table width="100%" cellPadding={10} style={{ borderCollapse:"collapse", borderRadius:12, overflow:"hidden" }}>
-              <thead>
-                <tr style={{ background:"linear-gradient(90deg,#fff,rgba(248,250,252,.95))", color:"#1f2937", fontWeight:700, borderBottom:"2px solid #e5e7eb" }}>
-                  <th>Order #</th>
-                  <th>Khách hàng</th>
-                  <th>Email</th>
-                  <th>SĐT</th>
-                  <th style={{ textAlign:"right" }}>Tổng tiền</th>
-                  <th style={{ minWidth: 360 }}>Trạng thái</th>
-                  <th style={{ textAlign:"center" }}>Chi tiết</th>
+        {!loading && !err && (
+          <>
+            <table style={{ width: "100%", borderCollapse: "collapse", color: "#fff" }}>
+              <thead style={{ background: "rgba(255,255,255,0.1)" }}>
+                <tr>
+                  <th style={{ padding: 8, textAlign: "left", borderBottom: "1px solid #fff" }}>Order #</th>
+                  <th style={{ padding: 8, textAlign: "left", borderBottom: "1px solid #fff" }}>Customer</th>
+                  <th style={{ padding: 8, textAlign: "left", borderBottom: "1px solid #fff" }}>Email</th>
+                  <th style={{ padding: 8, textAlign: "left", borderBottom: "1px solid #fff" }}>Phone</th>
+                  <th style={{ padding: 8, textAlign: "right", borderBottom: "1px solid #fff" }}>Total</th>
+                  <th style={{ padding: 8, minWidth: 360, borderBottom: "1px solid #fff" }}>Status</th>
+                  <th style={{ padding: 8, textAlign: "center", borderBottom: "1px solid #fff" }}>Detail</th>
                 </tr>
               </thead>
+
               <tbody>
-                {orders.map((o, i) => {
+                {orders.map((o) => {
                   const canceled = o.statusKey === "canceled";
                   const idx = canceled ? -1 : stepIndex(o.statusKey);
                   return (
-                    <tr
-                      key={o.id}
-                      style={{
-                        background: i % 2 === 0 ? "rgba(255,255,255,0.98)" : "rgba(248,250,252,0.95)",
-                        borderTop: "1px solid #eee",
-                        transition: "background .2s ease",
-                        verticalAlign: "middle",
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "rgba(255,255,255,0.98)" : "rgba(248,250,252,0.95)")}
-                    >
-                      <td>{o.id}</td>
-                      <td style={{ fontWeight: 600 }}>{o.name}</td>
-                      <td style={{ color: "#475569" }}>{o.email}</td>
-                      <td>{o.phone}</td>
-                      <td align="right">₫{VND.format(Number(o.total ?? 0))}</td>
+                    <tr key={o.id} style={{ borderTop: "1px solid #fff" }}>
+                      <td style={{ padding: 8 }}>{o.id}</td>
+                      <td style={{ padding: 8, fontWeight: 700 }}>{o.name}</td>
+                      <td style={{ padding: 8, color: "#ccc" }}>{o.email}</td>
+                      <td style={{ padding: 8 }}>{o.phone}</td>
+                      <td style={{ padding: 8, textAlign: "right" }}>₫{VND.format(Number(o.total ?? 0))}</td>
 
-                      <td>
-                        {/* step bar */}
-                        <div style={{ display:"grid", gridTemplateColumns:`repeat(${STEPS.length}, 1fr)`, gap:6 }}>
+                      <td style={{ padding: 8 }}>
+                        {/* Step bar */}
+                        <div style={{ display: "grid", gridTemplateColumns: `repeat(${STEPS.length}, 1fr)`, gap: 6 }}>
                           {STEPS.map((s, ii) => {
                             const done = !canceled && ii <= idx;
                             return (
                               <div
                                 key={s.key}
                                 onClick={() => (!canceled && !savingId) && updateStatus(o, s.key)}
-                                title={canceled ? "Đã hủy" : s.label}
+                                title={canceled ? "Canceled" : s.label}
                                 style={{
-                                  height: 8, borderRadius: 999,
+                                  height: 8,
+                                  borderRadius: 999,
                                   background: canceled ? "#e5e7eb" : (done ? "#10b981" : "#e5e7eb"),
                                   cursor: canceled || savingId ? "not-allowed" : "pointer",
                                   transition: "all .15s ease",
@@ -303,39 +332,43 @@ export default function Orders() {
                           })}
                         </div>
 
-                        {/* status badge */}
+                        {/* Status Badge */}
                         <div style={{ marginTop: 6 }}>
                           <span
                             style={
                               canceled
-                                ? { background:"#fef2f2", color:"#991b1b", border:"1px solid #fecaca",
-                                    padding:"2px 8px", borderRadius:999, fontSize:12, fontWeight:700 }
+                                ? {
+                                    background: "#fef2f2",
+                                    color: "#991b1b",
+                                    border: "1px solid #fecaca",
+                                    padding: "2px 8px",
+                                    borderRadius: 999,
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                  }
                                 : badgeStyle(o.statusKey)
                             }
                           >
-                            {canceled ? "Đã hủy" : (STEPS[idx]?.label || "Trạng thái")}
-                            {savingId === o.id && !canceled && " • đang lưu..."}
+                            {canceled ? "Canceled" : (STEPS[idx]?.label || "Status")}
+                            {savingId === o.id && !canceled && " • saving..."}
                           </span>
                         </div>
                       </td>
 
-                      <td align="center">
+                      <td style={{ padding: 8, textAlign: "center" }}>
                         <button
                           onClick={() => navigate(`/admin/orders/${o.id}`)}
                           style={{
-                            padding: "6px 14px",
-                            background: "#16a34a",
-                            color: "#fff",
-                            border: 0,
-                            borderRadius: 8,
+                            background: colors.primary,
+                            border: "none",
+                            color: "#000",
+                            padding: "6px 10px",
+                            borderRadius: 6,
                             cursor: "pointer",
-                            fontWeight: 600,
-                            transition: "transform .15s ease",
+                            fontWeight: 700,
                           }}
-                          onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1.0)")}
                         >
-                          Xem
+                          View
                         </button>
                       </td>
                     </tr>
@@ -344,117 +377,48 @@ export default function Orders() {
 
                 {orders.length === 0 && (
                   <tr>
-                    <td colSpan={7} align="center" style={{ padding: 20, color: "#6b7280" }}>
-                      Không có đơn hàng.
+                    <td colSpan={7} style={{ padding: 16, textAlign: "center", color: "#ccc" }}>
+                      No orders found.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-          </div>
 
-          {/* PHÂN TRANG (giống Products) */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              marginTop: 14,
-              background: "rgba(255,255,255,0.9)",
-              borderRadius: 10,
-              padding: "10px 12px",
-              boxShadow: "0 2px 10px rgba(0,0,0,.08)",
-              color: "#111827",
-            }}
-          >
-            <div style={{ fontSize: 14, color: "#111827" }}>
-              Trang <b>{page}</b> / <b>{lastPage}</b> — Tổng: <b>{total}</b>
-            </div>
-
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              <button
-                onClick={() => gotoPage(1)}
-                disabled={page <= 1}
+            {/* PAGINATION */}
+            {lastPage > 1 && (
+              <div
                 style={{
-                  padding: "6px 10px",
+                  position: "absolute",
+                  bottom: 10,
+                  right: 10,
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                  background: "rgba(0,0,0,0.6)",
+                  padding: "8px 14px",
                   borderRadius: 8,
-                  border: "1px solid #e5e7eb",
-                  background: page <= 1 ? "#f3f4f6" : "#fff",
-                  cursor: page <= 1 ? "not-allowed" : "pointer",
-                  color: "#111827",
+                  border: "1px solid #fff",
                 }}
               >
-                « Đầu
-              </button>
-              <button
-                onClick={() => gotoPage(page - 1)}
-                disabled={page <= 1}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #e5e7eb",
-                  background: page <= 1 ? "#f3f4f6" : "#fff",
-                  cursor: page <= 1 ? "not-allowed" : "pointer",
-                  color: "#111827",
-                }}
-              >
-                ‹ Trước
-              </button>
+                <button style={btnBase(page <= 1)} disabled={page <= 1} onClick={() => gotoPage(1)}>« First</button>
+                <button style={btnBase(page <= 1)} disabled={page <= 1} onClick={() => gotoPage(page - 1)}>‹ Previous</button>
 
-              {pageNumbers.map((n) => {
-                const isActive = n === page;
-                return (
-                  <button
-                    key={n}
-                    onClick={() => gotoPage(n)}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: 8,
-                      border: "1px solid #111827",
-                      background: "#fff",
-                      color: "#111827",
-                      fontWeight: isActive ? 800 : 600,
-                      textDecoration: isActive ? "underline" : "none",
-                    }}
-                  >
-                    {n}
-                  </button>
-                );
-              })}
+                {pageNumbers.map((n) => (
+                  <button key={n} style={btnNumber(n === page)} onClick={() => gotoPage(n)}>{n}</button>
+                ))}
 
-              <button
-                onClick={() => gotoPage(page + 1)}
-                disabled={page >= lastPage}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #e5e7eb",
-                  background: page >= lastPage ? "#f3f4f6" : "#fff",
-                  cursor: page >= lastPage ? "not-allowed" : "pointer",
-                  color: "#111827",
-                }}
-              >
-                Sau ›
-              </button>
-              <button
-                onClick={() => gotoPage(lastPage)}
-                disabled={page >= lastPage}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #e5e7eb",
-                  background: page >= lastPage ? "#f3f4f6" : "#fff",
-                  cursor: page >= lastPage ? "not-allowed" : "pointer",
-                  color: "#111827",
-                }}
-              >
-                Cuối »
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-    </section>
+                <button style={btnBase(page >= lastPage)} disabled={page >= lastPage} onClick={() => gotoPage(page + 1)}>Next ›</button>
+                <button style={btnBase(page >= lastPage)} disabled={page >= lastPage} onClick={() => gotoPage(lastPage)}>Last »</button>
+
+                <div style={{ color: "#fff", fontSize: 14 }}>
+                  Page <b>{page}</b>/<b>{lastPage}</b> — Total: <b>{total}</b>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }

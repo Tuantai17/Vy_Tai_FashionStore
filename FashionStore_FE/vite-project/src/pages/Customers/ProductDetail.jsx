@@ -1,6 +1,8 @@
+// src/pages/Customers/ProductDetail.jsx
 import { useEffect, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import DOMPurify from "dompurify";
+import ProductCard from "../../components/ProductCard";
 
 const APP_BASE = "http://127.0.0.1:8000";
 const API_BASE = `${APP_BASE}/api`;
@@ -11,6 +13,7 @@ const VND = new Intl.NumberFormat("vi-VN");
 export default function ProductDetail({ addToCart }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [product, setProduct] = useState(null);
   const [related, setRelated] = useState([]);
@@ -19,12 +22,23 @@ export default function ProductDetail({ addToCart }) {
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState("description");
 
-  // Reviews (view-only)
   const [reviews, setReviews] = useState([]);
-
-  // NEW: brand & category names
   const [brandName, setBrandName] = useState("");
   const [categoryName, setCategoryName] = useState("");
+
+  // ---- Review form states
+  const [canReview, setCanReview] = useState(null); // true/false/null(unknown)
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  // Nếu có ?review=1 thì nhảy sang tab "reviews"
+  useEffect(() => {
+    const sp = new URLSearchParams(location.search);
+    if (sp.get("review") === "1") {
+      setActiveTab("reviews");
+    }
+  }, [location.search]);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -97,8 +111,8 @@ export default function ProductDetail({ addToCart }) {
         // related
         if (data?.category_id) {
           const relatedEndpoints = [
-            `${API_BASE}/categories/${data.category_id}/products`,
-            `${APP_BASE}/categories/${data.category_id}/products`,
+            `${API_BASE}/categories/${data.category_id}/products?all=1`,
+            `${APP_BASE}/categories/${data.category_id}/products?all=1`,
           ];
           let rel = null;
           for (const url of relatedEndpoints) {
@@ -147,6 +161,40 @@ export default function ProductDetail({ addToCart }) {
       }
     })();
 
+    return () => ac.abort();
+  }, [id]);
+
+  // Check quyền review (nếu backend có API can-review)
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setCanReview(false);
+      return;
+    }
+    const ac = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/products/${id}/can-review`, {
+          method: "GET",
+          signal: ac.signal,
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (res.ok) {
+          const d = await res.json();
+          const val = d.canReview ?? d.can ?? d.allowed;
+          // nếu API trả undefined thì coi như cho phép
+          setCanReview(typeof val === "boolean" ? val : true);
+        } else {
+          // nếu API không có/ lỗi → không chặn
+          setCanReview(true);
+        }
+      } catch {
+        setCanReview(true);
+      }
+    })();
     return () => ac.abort();
   }, [id]);
 
@@ -214,7 +262,6 @@ export default function ProductDetail({ addToCart }) {
     }
   };
 
-  // styles for +/- buttons
   const qtyBtnStyle = {
     width: 36,
     height: 36,
@@ -228,6 +275,62 @@ export default function ProductDetail({ addToCart }) {
   };
 
   const safeDesc = DOMPurify.sanitize(product.description || "");
+
+  // ---- submit review
+  const submitReview = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Vui lòng đăng nhập để đánh giá.");
+      navigate("/login", { state: { from: `/products/${id}?review=1` } });
+      return;
+    }
+    if (!rating || !comment.trim()) {
+      alert("Vui lòng chọn số sao và nhập nội dung.");
+      return;
+    }
+    try {
+      setSubmitting(true);
+      const res = await fetch(`${API_BASE}/products/${id}/reviews`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ rating: Number(rating), comment: comment.trim() }),
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        throw new Error(t || "Không gửi được đánh giá.");
+      }
+      const d = await res.json().catch(() => ({}));
+      const newReview = d.data || d.review || {
+        id: Date.now(),
+        rating: Number(rating),
+        comment: comment.trim(),
+        user: { name: "Bạn" },
+        created_at: new Date().toISOString(),
+      };
+      setReviews((prev) => [newReview, ...prev]);
+      setComment("");
+      setRating(5);
+      alert("✅ Cảm ơn bạn đã đánh giá!");
+    } catch (e2) {
+      alert("❌ " + (e2.message || "Gửi đánh giá thất bại."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Có hiển thị form không?
+  const searchWantsReview = new URLSearchParams(location.search).get("review") === "1";
+  const isLoggedIn = !!localStorage.getItem("token");
+  const showReviewForm =
+    activeTab === "reviews" &&
+    isLoggedIn &&
+    (canReview === null ? true : !!canReview) && // nếu backend không rõ → cho hiện
+    searchWantsReview;
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "20px" }}>
@@ -257,7 +360,7 @@ export default function ProductDetail({ addToCart }) {
             {price > 0 ? `${VND.format(price)}đ` : "Liên hệ"}
           </div>
 
-          {/* NEW: category + brand */}
+          {/* category + brand */}
           <div style={{ fontSize: 14, color: "#555", marginBottom: 16 }}>
             <div>Danh mục: <span style={{ fontWeight: 600 }}>{categoryName || "Chưa cập nhật"}</span></div>
             <div>Thương hiệu: <span style={{ fontWeight: 600 }}>{brandName || "Chưa cập nhật"}</span></div>
@@ -278,14 +381,7 @@ export default function ProductDetail({ addToCart }) {
                 min="1"
                 value={quantity}
                 onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                style={{
-                  width: 60,
-                  height: 36,
-                  textAlign: "center",
-                  border: "1px solid #ddd",
-                  borderRadius: 6,
-                  fontSize: 16
-                }}
+                style={{ width: 60, height: 36, textAlign: "center", border: "1px solid #ddd", borderRadius: 6, fontSize: 16 }}
               />
               <button onClick={() => setQuantity(quantity + 1)} style={qtyBtnStyle}>+</button>
             </div>
@@ -333,6 +429,24 @@ export default function ProductDetail({ addToCart }) {
         </div>
       </div>
 
+      {/* CSS lưới cho related */}
+      <style>{`
+        .related-grid{
+          display:grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 20px;
+        }
+        @media (max-width: 1024px){
+          .related-grid{ grid-template-columns: repeat(3, minmax(0,1fr)); }
+        }
+        @media (max-width: 768px){
+          .related-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+        }
+        @media (max-width: 480px){
+          .related-grid{ grid-template-columns: repeat(1, minmax(0,1fr)); }
+        }
+      `}</style>
+
       {/* Tabs */}
       <div style={{ marginTop: 48, borderTop: "1px solid #e5e5e5" }}>
         <div style={{ display: "flex", gap: 32, borderBottom: "1px solid #e5e5e5" }}>
@@ -366,6 +480,21 @@ export default function ProductDetail({ addToCart }) {
           >
             Đánh giá ({reviews.length})
           </button>
+          <button
+            onClick={() => setActiveTab("related")}
+            style={{
+              padding: "16px 0",
+              background: "none",
+              border: "none",
+              borderBottom: activeTab === "related" ? "2px solid #000" : "2px solid transparent",
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: "pointer",
+              color: activeTab === "related" ? "#000" : "#999",
+            }}
+          >
+            Sản phẩm liên quan ({related.length})
+          </button>
         </div>
 
         {activeTab === "description" && (
@@ -377,7 +506,73 @@ export default function ProductDetail({ addToCart }) {
 
         {activeTab === "reviews" && (
           <div>
-            <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: "#000" }}>
+            {/* FORM ĐÁNH GIÁ — hiện khi ?review=1 + đã đăng nhập + (canReview true hoặc null) */}
+            {showReviewForm && (
+              <form
+                onSubmit={submitReview}
+                style={{
+                  background: "#f8fff9",
+                  border: "1px solid #dcfce7",
+                  borderRadius: 8,
+                  padding: 16,
+                  margin: "16px 0",
+                }}
+              >
+                <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 10 }}>
+                  <label style={{ fontWeight: 700 }}>Chấm sao:</label>
+                  <select
+                    value={rating}
+                    onChange={(e) => setRating(Number(e.target.value))}
+                    style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ccc" }}
+                  >
+                    {[5,4,3,2,1].map((s) => (
+                      <option key={s} value={s}>{s} ★</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                  <label style={{ fontWeight: 700, display: "block", marginBottom: 6 }}>Nhận xét</label>
+                  <textarea
+                    rows={4}
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Hãy chia sẻ trải nghiệm của bạn…"
+                    style={{ width: "100%", borderRadius: 8, border: "1px solid #ccc", padding: 10 }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  style={{
+                    padding: "10px 16px",
+                    background: "#16a34a",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 8,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {submitting ? "Đang gửi..." : "Gửi đánh giá"}
+                </button>
+              </form>
+            )}
+
+            {/* Gợi ý đăng nhập / không đủ điều kiện */}
+            {activeTab === "reviews" && !isLoggedIn && (
+              <div style={{ margin: "12px 0", color: "#444" }}>
+                Vui lòng <Link to={`/login?next=/products/${id}%3Freview%3D1`} style={{ color: "#16a34a" }}>đăng nhập</Link> để đánh giá sản phẩm.
+              </div>
+            )}
+            {activeTab === "reviews" && isLoggedIn && canReview === false && (
+              <div style={{ margin: "12px 0", color: "#666" }}>
+                Bạn chưa đủ điều kiện để đánh giá sản phẩm này.
+              </div>
+            )}
+
+            <h3 style={{ fontSize: 20, fontWeight: 700, margin: "16px 0", color: "#000" }}>
               Đánh giá khách hàng
             </h3>
 
@@ -390,8 +585,8 @@ export default function ProductDetail({ addToCart }) {
                     key={r.id || i}
                     style={{ background: "#fff", border: "1px solid #f0f0f0", borderRadius: 8, padding: 16 }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
-                      <span style={{ fontWeight: 600, fontSize: 15, marginRight: 12, color: "#000" }}>
+                    <div style={{ display: "flex", alignItems: "center", marginBottom: 8, gap: 12 }}>
+                      <span style={{ fontWeight: 600, fontSize: 15, color: "#000" }}>
                         {r.user?.name || r.author_name || "Ẩn danh"}
                       </span>
                       <span style={{ color: "#ffa500", fontSize: 14 }}>
@@ -413,69 +608,27 @@ export default function ProductDetail({ addToCart }) {
             )}
           </div>
         )}
-      </div>
 
-      {/* related */}
-      {!!related.length && (
-        <div
-          style={{
-            marginTop: 64,
-            padding: "24px 0",
-            background: "#f5f5f5",
-            marginLeft: -20,
-            marginRight: -20,
-            paddingLeft: 20,
-            paddingRight: 20,
-          }}
-        >
-          <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24, color: "#2e7d32" }}>
-            Sản phẩm liên quan
-          </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 20 }}>
-            {related.map((p) => {
-              const rImg = p.thumbnail_url
-                ? p.thumbnail_url
-                : p.thumbnail
-                ? `${APP_BASE}/storage/${p.thumbnail}`
-                : PLACEHOLDER;
-              const rPrice = Number(p.price ?? 0);
-              return (
-                <Link key={p.id} to={`/products/${p.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-                  <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
-                    <div style={{ aspectRatio: "3/4", background: "#fafafa" }}>
-                      <img
-                        src={rImg}
-                        alt={p.name}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        onError={(e) => (e.currentTarget.src = PLACEHOLDER)}
-                        loading="lazy"
-                      />
-                    </div>
-                    <div style={{ padding: 12 }}>
-                      <div
-                        style={{
-                          fontWeight: 600,
-                          fontSize: 14,
-                          marginBottom: 6,
-                          color: "#000",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {p.name}
-                      </div>
-                      <div style={{ color: "#2e7d32", fontWeight: 700, fontSize: 16 }}>
-                        {rPrice > 0 ? `${VND.format(rPrice)} đ` : "Liên hệ"}
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
+        {activeTab === "related" && (
+          <div style={{ paddingTop: 20 }}>
+            {related.length === 0 ? (
+              <div style={{ color: "#999", fontSize: 14 }}>Không có sản phẩm liên quan.</div>
+            ) : (
+              <div className="related-grid">
+                {related.map((p) => (
+                  <ProductCard
+                    key={p.id}
+                    p={{
+                      ...p,
+                      image: p.image_url || p.thumbnail_url || p.thumbnail || p.image || PLACEHOLDER,
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

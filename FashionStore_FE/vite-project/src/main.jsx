@@ -19,22 +19,27 @@ import Contact from "./pages/Customers/Contact";
 import MyOrders from "./pages/Customers/MyOrders";
 import OrderTracking from "./pages/Customers/OrderTracking";
 import ReviewSection from "./pages/Customers/ReviewSection";
+// import Wishlist from "./pages/Customers/Wishlist";
 
 // ===== Admin pages/layout =====
 import AdminLayout from "./layouts/AdminLayout";
 import Dashboard from "./pages/Admin/Dashboard";
 import AdminProducts from "./pages/Admin/Product/Products";
+import AdminInventories from "./pages/Admin/Inventories/Inventories";
+
 import AdminCategories from "./pages/Admin/Category/Categories";
 import AdminOrders from "./pages/Admin/Order/Orders";
 import AdminUsers from "./pages/Admin/User/Users";
 import AddProduct from "./pages/Admin/Product/AddProduct";
 import EditProduct from "./pages/Admin/Product/EditProduct";
+import ShowProduct from "./pages/Admin/Product/ShowProduct.jsx";
+
 import LoginAdmin from "./pages/Admin/LoginAdmin";
 import AdminRoute from "./components/AdminRoute";
 import OrderDetail from "./pages/Admin/Order/OrderDetail"; 
 import AddCategory from "./pages/Admin/Category/AddCategory";
 import EditCategory from "./pages/Admin/Category/EditCategory.jsx";
-import ShowProduct from "./pages/Admin/Product/ShowProduct.jsx";
+import ShowCategory from "./pages/Admin/Category/ShowCategory.jsx";
 
 
 import Settings from "./pages/Admin/Settings/Settings.jsx";
@@ -315,6 +320,26 @@ function Layout({ children }) {
             }}
           />
 
+          {/* <NavLink
+            to="/wishlist"
+            id="wishlist-target"
+            title="Yêu thích"
+            style={{
+              width: 33,
+              height: 33,
+              borderRadius: "50%",
+              border: "1px solid #d1d5db",
+              display: "inline-block",
+              backgroundImage: "url('http://127.0.0.1:8000/assets/images/wishlist.jpg')",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+              marginRight: 10,
+
+              transform: "translateY(12px)", 
+            }}
+          /> */}
+
          
           <NavLink
             to="/contact"
@@ -338,7 +363,26 @@ function Layout({ children }) {
           />
 
 
-
+          {/* Tin tức */}
+          <NavLink
+            to="/news"
+            id="news-target"
+            title="Tin tức"
+            className={({ isActive }) => (isActive ? "ring-2 ring-black" : "")}
+            style={{
+              width: 33,
+              height: 33,
+              borderRadius: "50%",
+              border: "1px solid #d1d5db",
+              display: "inline-block",
+              backgroundImage: "url('http://127.0.0.1:8000/assets/images/news.jpg')", // đổi tên file nếu khác
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+              marginRight: 10,
+              transform: "translateY(12px)",
+            }}
+          />
 
           {/* User / Logout giữ nguyên */}
           {user ? (
@@ -457,6 +501,8 @@ function App() {
         <Route path="/contact" element={<Layout><Contact /></Layout>} />
         <Route path="/track" element={<OrderTracking />} />
         <Route path="/me/orders" element={<Layout><MyOrders /></Layout>} />
+        {/* <Route path="/wishlist" element={<Layout><Wishlist /></Layout>} /> */}
+
 
         {/* Admin */}
         <Route path="/admin/login" element={<LoginAdmin />} />
@@ -472,16 +518,22 @@ function App() {
           }
         >
           <Route index element={<Dashboard />} />
+          
           <Route path="products" element={<AdminProducts />} />
           <Route path="products/new" element={<AddProduct />} />
           <Route path="products/:id/edit" element={<EditProduct />} />
           <Route path="products/:id" element={<ShowProduct />} />
+
+          <Route path="inventories" element={<AdminInventories />} />
+
+
+         
           <Route path="categories" element={<AdminCategories />} />
+          <Route path="categories/:id" element={<ShowCategory />} />
+          <Route path="categories/add" element={<AddCategory />} />
+
           <Route path="orders" element={<AdminOrders />} />
           <Route path="users" element={<AdminUsers />} />
-          <Route path="categories/add" element={<AddCategory />} />
-          {/* <Route path="categories/trash" element={<TrashCategory />} /> */}
-
 
 
           <Route path="settings" element={<Settings />} />

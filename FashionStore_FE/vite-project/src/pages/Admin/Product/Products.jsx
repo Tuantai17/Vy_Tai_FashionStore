@@ -1,7 +1,9 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿// src/pages/Admin/Product/Products.jsx
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API_BASE = "http://127.0.0.1:8000/api";
+const APP_BASE = API_BASE.replace(/\/api$/, "");
 
 export default function Products() {
   const [items, setItems] = useState([]);
@@ -11,6 +13,14 @@ export default function Products() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [view, setView] = useState("active"); // "active" | "trash"
 
+  // ====== filters ======
+  const [categories, setCategories] = useState([]);
+  const [category, setCategory] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  // Tập ID sản phẩm thuộc danh mục (để lọc client-side)
+  const [catProductIds, setCatProductIds] = useState(null);
+
   // ===== phân trang =====
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
@@ -18,9 +28,61 @@ export default function Products() {
   const perPage = 10;
 
   const navigate = useNavigate();
-  const APP_BASE = API_BASE.replace(/\/api$/, "");
 
-  // ===== fetch theo view + page =====
+  // ===== THEME =====
+  const colors = {
+    text: "#ffffff",
+    border: "#ffffff",
+    bg: "rgba(255,255,255,0.1)",
+    bgDisabled: "rgba(255,255,255,0.2)",
+    primary: "#00bcd4",
+    danger: "#dc2626",
+    success: "#16a34a",
+    info: "#0ea5e9",
+  };
+  const btnBase = (disabled) => ({
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: `1px solid ${colors.border}`,
+    background: disabled ? colors.bgDisabled : colors.bg,
+    color: colors.text,
+    cursor: disabled ? "not-allowed" : "pointer",
+    fontWeight: 700,
+  });
+  const btnSolid = (bg, disabled = false) => ({
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "none",
+    background: disabled ? colors.bgDisabled : bg,
+    color: disabled ? "#eee" : "#000",
+    cursor: disabled ? "not-allowed" : "pointer",
+    fontWeight: 700,
+  });
+  const btnNumber = (active) => ({
+    padding: "6px 10px",
+    borderRadius: 8,
+    border: `1px solid ${active ? colors.primary : colors.border}`,
+    background: active ? colors.primary : colors.bg,
+    color: active ? "#000" : colors.text,
+    fontWeight: active ? 800 : 600,
+    textDecoration: active ? "underline" : "none",
+    cursor: "pointer",
+  });
+
+  // ===== load categories for filter =====
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/categories?per_page=-1`);
+        const data = await res.json();
+        setCategories(Array.isArray(data) ? data : data.data || []);
+      } catch (e) {
+        console.error("Failed to load categories:", e);
+      }
+    })();
+  }, []);
+
+  // ===== fetch theo view + page (giữ nguyên logic) =====
   useEffect(() => {
     const ac = new AbortController();
     (async () => {
@@ -62,7 +124,38 @@ export default function Products() {
     setPage(1);
   }, [view]);
 
-  // ===== soft delete 1 (xóa tạm) =====
+  // Khi đổi bộ lọc (q/category/min/max) → về trang 1
+  useEffect(() => {
+    setPage(1);
+  }, [q, category, minPrice, maxPrice]);
+
+  // ===== tải ID sản phẩm thuộc danh mục đang chọn (để lọc client) =====
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      if (!category) {
+        setCatProductIds(null);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `${APP_BASE}/api/categories/${category}/products?per_page=-1`
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : data.data ?? [];
+        if (!ignore) setCatProductIds(new Set(list.map((p) => p.id)));
+      } catch (e) {
+        console.error("Load category products failed:", e);
+        if (!ignore) setCatProductIds(new Set()); // rỗng rõ ràng khi lỗi
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
+  }, [category]);
+
+  // ===== hành động đơn lẻ/bulk (giữ nguyên) =====
   const handleSoftDelete = async (id) => {
     if (!window.confirm(`Xoá tạm sản phẩm #${id}?`)) return;
     const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
@@ -90,7 +183,6 @@ export default function Products() {
     }
   };
 
-  // ===== khôi phục 1 =====
   const handleRestore = async (id) => {
     const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
     try {
@@ -113,7 +205,6 @@ export default function Products() {
     }
   };
 
-  // ===== xóa vĩnh viễn 1 =====
   const handleForceDelete = async (id) => {
     if (!window.confirm(`Xóa vĩnh viễn sản phẩm #${id}? Hành động không thể hoàn tác!`)) return;
     const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
@@ -137,7 +228,6 @@ export default function Products() {
     }
   };
 
-  // ===== bulk theo view =====
   const handleBulkAction = async (action) => {
     if (selectedIds.size === 0) return;
 
@@ -219,31 +309,53 @@ export default function Products() {
     }
   };
 
-  // ===== SHOW: mở trang chi tiết sản phẩm (có cả đánh giá) =====
-  // const handleShowSelected = () => {
-  //   if (selectedIds.size !== 1) return;
-  //   const id = Array.from(selectedIds)[0];
-  //   // Mở trang khách hàng /products/:id (hiển thị đầy đủ thông tin + reviews)
-  //   window.open(`/products/${id}`, "_blank"); // mở tab mới; dùng navigate(`/products/${id}`) nếu muốn trong SPA
-  // };
-
   const handleShowSelected = () => {
-   if (selectedIds.size !== 1) return;
-   const id = Array.from(selectedIds)[0];
-   // sang trang show ở admin
-   navigate(`/admin/products/${id}`);
- };
+    if (selectedIds.size !== 1) return;
+    const id = Array.from(selectedIds)[0];
+    navigate(`/admin/products/${id}`);
+  };
 
-  // ===== filter client =====
+  const handleEditSelected = () => {
+    if (selectedIds.size !== 1) return;
+    const id = Array.from(selectedIds)[0];
+    navigate(`/admin/products/${id}/edit`);
+  };
+
+  // ===== helpers filter =====
+  const priceOf = (p) => Number(p.price_sale ?? p.sale_price ?? p.price_root ?? p.price ?? 0);
+
+  // ===== filter client (keyword + category bằng ID + price) =====
   const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return items;
-    return items.filter(
-      (x) => x.name?.toLowerCase().includes(s) || x.slug?.toLowerCase().includes(s)
-    );
-  }, [q, items]);
+    let list = items;
 
-  // ===== chọn/bỏ chọn =====
+    // keyword
+    const s = q.trim().toLowerCase();
+    if (s) {
+      list = list.filter(
+        (x) =>
+          x.name?.toLowerCase().includes(s) ||
+          x.slug?.toLowerCase().includes(s) ||
+          String(x.id || "").includes(s)
+      );
+    }
+
+    // category (dựa trên ID lấy từ /api/categories/:id/products)
+    if (category) {
+      // Chưa tải xong -> coi như chưa có dữ liệu để hiển thị (tránh nhấp nháy sai)
+      if (catProductIds == null) return [];
+      list = list.filter((p) => catProductIds.has(p.id));
+    }
+
+    // price range
+    const min = minPrice === "" ? null : Number(minPrice);
+    const max = maxPrice === "" ? null : Number(maxPrice);
+    if (min != null && !Number.isNaN(min)) list = list.filter((p) => priceOf(p) >= min);
+    if (max != null && !Number.isNaN(max)) list = list.filter((p) => priceOf(p) <= max);
+
+    return list;
+  }, [items, q, category, catProductIds, minPrice, maxPrice]);
+
+  // ===== chọn/bỏ chọn (giữ nguyên) =====
   const toggleOne = (id) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -266,13 +378,12 @@ export default function Products() {
     });
   };
 
-  // ===== điều khiển trang =====
+  // ===== điều khiển trang (giữ nguyên) =====
   const gotoPage = (p) => {
     if (p < 1 || p > lastPage || p === page) return;
     setPage(p);
   };
 
-  // ===== mảng số trang =====
   const pageNumbers = useMemo(() => {
     const maxButtons = 7;
     const pages = [];
@@ -282,9 +393,11 @@ export default function Products() {
       let start = Math.max(1, page - 3);
       let end = Math.min(lastPage, page + 3);
       if (page <= 4) {
-        start = 1; end = 7;
+        start = 1;
+        end = 7;
       } else if (page >= lastPage - 3) {
-        start = lastPage - 6; end = lastPage;
+        start = lastPage - 6;
+        end = lastPage;
       }
       for (let i = start; i <= end; i++) pages.push(i);
     }
@@ -292,432 +405,404 @@ export default function Products() {
   }, [page, lastPage]);
 
   return (
-    <section
+    <div
       style={{
+        maxWidth: 1400,
+        width: "min(96vw, 1400px)",
+        margin: "24px auto",
         padding: 20,
-        background: "rgba(255,255,255,0.08)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-        borderRadius: 16,
-        boxShadow: "0 8px 20px rgba(3,10,27,.25)",
+        color: "#fff",
       }}
     >
-      {/* HEADER */}
+      <h2 style={{ marginBottom: 12 }}>
+        Product Management {view === "trash" ? "— Trash" : ""}
+      </h2>
+
+      {/* Thanh tìm + action */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search Name / Slug"
+          style={{
+            flex: 1,
+            minWidth: 260,
+            padding: 8,
+            borderRadius: 8,
+            border: "1px solid #ccc",
+            background: colors.bg,
+            color: colors.text,
+          }}
+        />
+
+        {/* CHỈ hiện Import/Export ở view ACTIVE */}
+        {view === "active" && (
+          <>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              id="excel-file"
+              style={{ display: "none" }}
+              onChange={async (e) => {
+                if (!e.target.files?.length) return;
+                const file = e.target.files[0];
+                const fd = new FormData();
+                fd.append("file", file);
+
+                const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
+                try {
+                  const res = await fetch(`${API_BASE}/admin/products/import`, {
+                    method: "POST",
+                    headers: {
+                      Accept: "application/json",
+                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    body: fd,
+                  });
+                  const j = await res.json();
+                  if (!res.ok) throw new Error(j.message || "Import lỗi");
+                  alert("✅ " + (j.message || "Import thành công"));
+                  setPage(1);
+                } catch (err) {
+                  alert("❌ " + err.message);
+                } finally {
+                  e.target.value = "";
+                }
+              }}
+            />
+            <button
+              onClick={() => document.getElementById("excel-file").click()}
+              style={btnBase(false)}
+              title="Import Excel (.xlsx, .csv)"
+            >
+              📤 Import
+            </button>
+
+            <button
+              onClick={async () => {
+                const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
+                try {
+                  const res = await fetch(`${API_BASE}/admin/products/export`, {
+                    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                  });
+                  if (!res.ok) throw new Error("Export lỗi");
+                  const blob = await res.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "products_export.xlsx";
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                } catch (e) {
+                  alert("❌ " + (e.message || "Không thể export"));
+                }
+              }}
+              style={btnBase(false)}
+            >
+              📥 Export
+            </button>
+          </>
+        )}
+
+        {view === "active" ? (
+          <>
+            <button
+              onClick={handleShowSelected}
+              disabled={selectedIds.size !== 1}
+              style={btnBase(selectedIds.size !== 1)}
+              title={selectedIds.size === 1 ? "Xem chi tiết" : "Chọn đúng 1 sản phẩm để xem"}
+            >
+              Show
+            </button>
+
+            {/* Add kiểu giống các nút khác */}
+            <button
+              onClick={() => navigate("/admin/products/new")}
+              style={btnBase(false)}
+              title="Thêm sản phẩm mới"
+            >
+              Add
+            </button>
+
+            <button
+              onClick={handleEditSelected}
+              disabled={selectedIds.size !== 1}
+              style={btnBase(selectedIds.size !== 1)}
+              title={selectedIds.size === 1 ? "Sửa sản phẩm đã chọn" : "Chọn đúng 1 sản phẩm để sửa"}
+            >
+              Edit
+            </button>
+
+            <button
+              onClick={() => handleBulkAction("soft-delete")}
+              disabled={selectedIds.size === 0}
+              style={{ ...btnSolid(colors.danger, selectedIds.size === 0), color: "#fff", border: `1px solid ${colors.border}` }}
+              title="Chuyển các sản phẩm chọn vào Thùng rác"
+            >
+              Move to Trash{selectedIds.size ? ` (${selectedIds.size})` : ""}
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => handleBulkAction("restore")}
+              disabled={selectedIds.size === 0}
+              style={{ ...btnSolid(colors.info, selectedIds.size === 0), color: "#fff" }}
+            >
+              Restore{selectedIds.size ? ` (${selectedIds.size})` : ""}
+            </button>
+            <button
+              onClick={() => handleBulkAction("force-delete")}
+              disabled={selectedIds.size === 0}
+              style={{ ...btnSolid("#b91c1c", selectedIds.size === 0), color: "#fff" }}
+            >
+              Delete Forever{selectedIds.size ? ` (${selectedIds.size})` : ""}
+            </button>
+          </>
+        )}
+
+        <button
+          onClick={() => setView((v) => (v === "active" ? "trash" : "active"))}
+          style={btnBase(false)}
+        >
+          {view === "trash" ? "← Product List" : "Trash"}
+        </button>
+      </div>
+
+      {/* === FILTER BAR === */}
       <div
         style={{
           display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 10,
-          marginBottom: 16,
+          flexWrap: "wrap",
+          gap: 16,
+          marginBottom: 20,
+          background: "rgba(255,255,255,0.05)",
+          padding: 16,
+          borderRadius: 8,
+          border: "1px solid rgba(255,255,255,0.2)",
         }}
       >
-        <h1
-          style={{
-            fontSize: 24,
-            fontWeight: 800,
-            color: "#fff",
-            letterSpacing: 0.3,
-            textShadow: "0 1px 2px rgba(0,0,0,.4)",
-          }}
-        >
-          Quản lý sản phẩm {view === "trash" ? "— Thùng rác" : ""}
-        </h1>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Tìm tên/slug…"
+        {/* Category */}
+        <div>
+          <label style={{ fontSize: 14, fontWeight: 600, display: "block", marginBottom: 4 }}>
+            Category
+          </label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
             style={{
-              height: 38,
-              padding: "0 12px",
-              border: "1px solid rgba(255,255,255,.25)",
-              borderRadius: 10,
-              background: "rgba(255,255,255,0.2)",
+              padding: "6px 10px",
+              borderRadius: 6,
+              border: "1px solid #ccc",
+              background: "rgba(255,255,255,0.1)",
               color: "#fff",
-              backdropFilter: "blur(6px)",
+              minWidth: 180,
+              colorScheme: "dark",
+              WebkitAppearance: "none",
+              MozAppearance: "none",
               outline: "none",
-              width: 200,
-            }}
-          />
-
-          {view === "active" ? (
-            <>
-              {/* Nút Xem (SHOW) — bật khi chọn đúng 1 sản phẩm */}
-              <button
-                onClick={handleShowSelected}
-                disabled={selectedIds.size !== 1}
-                title={
-                  selectedIds.size === 1
-                    ? "Xem chi tiết sản phẩm (mở tab mới)"
-                    : "Chọn đúng 1 sản phẩm để xem"
-                }
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 10,
-                  border: "1px solid #2563eb",
-                  background: selectedIds.size === 1 ? "#fff" : "#f1f5f9",
-                  color: selectedIds.size === 1 ? "#1d4ed8" : "#94a3b8",
-                  cursor: selectedIds.size === 1 ? "pointer" : "not-allowed",
-                  fontWeight: 700,
-                }}
-              >
-                Xem
-              </button>
-
-              <button
-                onClick={() => handleBulkAction("soft-delete")}
-                disabled={selectedIds.size === 0}
-                title={selectedIds.size ? `Đưa ${selectedIds.size} vào Thùng rác` : "Chọn mục để xoá tạm"}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 10,
-                  border: "none",
-                  background: selectedIds.size ? "#dc2626" : "rgba(220,38,38,.5)",
-                  color: "#fff",
-                  cursor: selectedIds.size ? "pointer" : "not-allowed",
-                  fontWeight: 700,
-                  boxShadow: selectedIds.size ? "0 3px 8px rgba(220,38,38,.35)" : "none",
-                }}
-              >
-                Xóa tạm (đã chọn){selectedIds.size ? ` (${selectedIds.size})` : ""}
-              </button>
-
-              <button
-                onClick={() => navigate("/admin/products/new")}
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: 10,
-                  border: "none",
-                  background: "linear-gradient(90deg,#2563eb,#0ea5e9)",
-                  color: "#fff",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  boxShadow: "0 3px 8px rgba(37,99,235,.35)",
-                }}
-              >
-                + Add
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => handleBulkAction("restore")}
-                disabled={selectedIds.size === 0}
-                title={selectedIds.size ? `Khôi phục ${selectedIds.size} mục` : "Chọn mục để khôi phục"}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 10,
-                  border: "none",
-                  background: selectedIds.size ? "#16a34a" : "rgba(22,163,74,.5)",
-                  color: "#fff",
-                  cursor: selectedIds.size ? "pointer" : "not-allowed",
-                  fontWeight: 700,
-                }}
-              >
-                Khôi phục (đã chọn){selectedIds.size ? ` (${selectedIds.size})` : ""}
-              </button>
-              <button
-                onClick={() => handleBulkAction("force-delete")}
-                disabled={selectedIds.size === 0}
-                title={selectedIds.size ? `Xóa vĩnh viễn ${selectedIds.size} mục` : "Chọn mục để xóa vĩnh viễn"}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 10,
-                  border: "none",
-                  background: selectedIds.size ? "#b91c1c" : "rgba(185,28,28,.5)",
-                  color: "#fff",
-                  cursor: selectedIds.size ? "pointer" : "not-allowed",
-                  fontWeight: 700,
-                }}
-              >
-                Xóa vĩnh viễn (đã chọn){selectedIds.size ? ` (${selectedIds.size})` : ""}
-              </button>
-            </>
-          )}
-
-          <button
-            onClick={() => setView((v) => (v === "active" ? "trash" : "active"))}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 10,
-              border: "1px solid #e5e7eb",
-              background: view === "trash" ? "#fff" : "#f8fafc",
-              color: "#111827",
-              fontWeight: 700,
             }}
           >
-            {view === "trash" ? "← Quay lại danh sách" : "🗑️ Thùng rác"}
+            <option value="" style={{ background: "#0b1220", color: "#fff" }}>
+              -- All --
+            </option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id} style={{ background: "#0b1220", color: "#fff" }}>
+                {c.name ?? c.title ?? c.slug ?? `#${c.id}`}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Price from */}
+        <div>
+          <label style={{ fontSize: 14, fontWeight: 600, display: "block", marginBottom: 4 }}>
+            Price from
+          </label>
+          <input
+            type="number"
+            value={minPrice}
+            onChange={(e) => setMinPrice(e.target.value)}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 6,
+              border: "1px solid #ccc",
+              background: "rgba(255,255,255,0.1)",
+              color: "#fff",
+              width: 120,
+            }}
+            placeholder="0"
+          />
+        </div>
+
+        {/* Price to */}
+        <div>
+          <label style={{ fontSize: 14, fontWeight: 600, display: "block", marginBottom: 4 }}>
+            To
+          </label>
+          <input
+            type="number"
+            value={maxPrice}
+            onChange={(e) => setMaxPrice(e.target.value)}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 6,
+              border: "1px solid #ccc",
+              background: "rgba(255,255,255,0.1)",
+              color: "#fff",
+              width: 120,
+            }}
+            placeholder="1000000"
+          />
+        </div>
+
+        {/* Reset */}
+        <div style={{ alignSelf: "flex-end" }}>
+          <button
+            onClick={() => {
+              setCategory("");
+              setMinPrice("");
+              setMaxPrice("");
+            }}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid #ccc",
+              background: "rgba(255,255,255,0.2)",
+              cursor: "pointer",
+              color: "#fff",
+            }}
+          >
+            🔄 Reset
           </button>
         </div>
       </div>
 
       {loading && <p style={{ color: "#ddd" }}>Đang tải dữ liệu…</p>}
-      {err && <p style={{ color: "red" }}>{err}</p>}
+      {err && <p style={{ color: "salmon" }}>{err}</p>}
 
+      {/* BẢNG (không cột hành động) + PHÂN TRANG CỐ ĐỊNH */}
       {!loading && (
-        <>
-          <div
-            style={{
-              overflowX: "auto",
-              marginTop: 12,
-              borderRadius: 12,
-              background: "rgba(255,255,255,0.9)",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-            }}
-          >
-            <table
-              width="100%"
-              cellPadding={10}
-              style={{
-                borderCollapse: "collapse",
-                borderRadius: 12,
-                overflow: "hidden",
-              }}
-            >
-              <thead>
-                <tr
-                  style={{
-                    background:
-                      "linear-gradient(90deg, rgba(255,255,255,1), rgba(248,250,252,0.95))",
-                    color: "#1f2937",
-                    fontWeight: 700,
-                    textAlign: "left",
-                    borderBottom: "2px solid #e5e7eb",
-                  }}
-                >
-                  <th style={{ width: 48, textAlign: "center" }}>
+        <div
+          style={{
+            position: "relative",
+            minHeight: "70vh",
+            border: `1px solid ${colors.border}`,
+            borderRadius: 8,
+            overflow: "hidden",
+            paddingBottom: "60px",
+          }}
+        >
+          <table style={{ width: "100%", borderCollapse: "collapse", color: colors.text }}>
+            <thead style={{ background: colors.bg }}>
+              <tr>
+                <th style={{ padding: 8, textAlign: "center", borderBottom: `1px solid ${colors.border}` }}>
+                  <input
+                    type="checkbox"
+                    checked={isAllVisibleChecked}
+                    onChange={toggleAllVisible}
+                    title="Chọn/Bỏ chọn tất cả"
+                  />
+                </th>
+                <th style={{ padding: 8, textAlign: "left", borderBottom: `1px solid ${colors.border}` }}>ID</th>
+                <th style={{ padding: 8, textAlign: "left", borderBottom: `1px solid ${colors.border}` }}>Name</th>
+                <th style={{ padding: 8, textAlign: "left", borderBottom: `1px solid ${colors.border}` }}>Slug</th>
+                <th style={{ padding: 8, textAlign: "right", borderBottom: `1px solid ${colors.border}` }}>Price root</th>
+                <th style={{ padding: 8, textAlign: "right", borderBottom: `1px solid ${colors.border}` }}>Price sale</th>
+                <th style={{ padding: 8, textAlign: "right", borderBottom: `1px solid ${colors.border}` }}>Inventory</th>
+                <th style={{ padding: 8, textAlign: "center", borderBottom: `1px solid ${colors.border}` }}>Image</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {filtered.map((p) => (
+                <tr key={p.id} style={{ borderTop: `1px solid ${colors.border}` }}>
+                  <td style={{ padding: 8, textAlign: "center" }}>
                     <input
                       type="checkbox"
-                      checked={isAllVisibleChecked}
-                      onChange={toggleAllVisible}
-                      title="Chọn/Bỏ chọn tất cả (đang hiển thị)"
+                      checked={selectedIds.has(p.id)}
+                      onChange={() => toggleOne(p.id)}
                     />
-                  </th>
-                  <th>ID</th>
-                  <th>Tên</th>
-                  <th>Slug</th>
-                  <th style={{ textAlign: "right" }}>Giá gốc</th>
-                  <th style={{ textAlign: "right" }}>Giá sale</th>
-                  <th style={{ textAlign: "right" }}>Tồn kho</th>
-                  <th style={{ textAlign: "center" }}>Ảnh</th>
-                  <th style={{ textAlign: "center" }}>Hành động</th>
+                  </td>
+                  <td style={{ padding: 8 }}>{p.id}</td>
+                  <td style={{ padding: 8, fontWeight: 700 }}>{p.name}</td>
+                  <td style={{ padding: 8, color: "#cbd5e1" }}>{p.slug}</td>
+                  <td style={{ padding: 8, textAlign: "right" }}>
+                    ₫{(p.price_root || 0).toLocaleString("vi-VN")}
+                  </td>
+                  <td style={{ padding: 8, textAlign: "right" }}>
+                    ₫{(p.price_sale || 0).toLocaleString("vi-VN")}
+                  </td>
+                  <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{p.qty}</td>
+                  <td style={{ padding: 8, textAlign: "center" }}>
+                    <img
+                      src={p.thumbnail_url || `${APP_BASE}/storage/${p.thumbnail}`}
+                      alt={p.name}
+                      style={{
+                        width: 60,
+                        height: 40,
+                        objectFit: "cover",
+                        borderRadius: 6,
+                        boxShadow: "0 0 4px rgba(255,255,255,.4)",
+                      }}
+                      onError={(e) => (e.currentTarget.src = "https://placehold.co/120x80?text=No+Img")}
+                    />
+                  </td>
                 </tr>
-              </thead>
+              ))}
+              {!filtered.length && (
+                <tr>
+                  <td colSpan={8} style={{ padding: 16, textAlign: "center", color: "#ccc" }}>
+                    Không có dữ liệu
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
 
-              <tbody>
-                {filtered.map((p, i) => (
-                  <tr
-                    key={p.id}
-                    style={{
-                      background:
-                        i % 2 === 0 ? "rgba(255,255,255,0.9)" : "rgba(248,250,252,0.95)",
-                      borderTop: "1px solid #eee",
-                      transition: "background .2s ease",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.background =
-                        i % 2 === 0 ? "rgba(255,255,255,0.9)" : "rgba(248,250,252,0.95)")
-                    }
-                  >
-                    <td align="center">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(p.id)}
-                        onChange={() => toggleOne(p.id)}
-                      />
-                    </td>
+          {/* PHÂN TRANG CỐ ĐỊNH */}
+          {lastPage > 1 && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: 10,
+                right: 10,
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+                background: "rgba(0,0,0,0.6)",
+                padding: "8px 14px",
+                borderRadius: 8,
+                border: `1px solid ${colors.border}`,
+              }}
+            >
+              <button style={btnBase(page <= 1)} disabled={page <= 1} onClick={() => gotoPage(1)}>
+                « First
+              </button>
+              <button style={btnBase(page <= 1)} disabled={page <= 1} onClick={() => gotoPage(page - 1)}>
+                ‹ Previous
+              </button>
 
-                    <td>{p.id}</td>
-                    <td style={{ fontWeight: 600 }}>{p.name}</td>
-                    <td style={{ color: "#475569" }}>{p.slug}</td>
-                    <td align="right">₫{(p.price_root || 0).toLocaleString("vi-VN")}</td>
-                    <td align="right">₫{(p.price_sale || 0).toLocaleString("vi-VN")}</td>
-                    <td align="right" style={{ fontWeight: 600 }}>
-                      {p.qty}
-                    </td>
-                    <td align="center">
-                      <img
-                        src={p.thumbnail_url || `${APP_BASE}/storage/${p.thumbnail}`}
-                        alt={p.name}
-                        style={{
-                          width: 60,
-                          height: 40,
-                          objectFit: "cover",
-                          borderRadius: 6,
-                          boxShadow: "0 0 4px rgba(0,0,0,.15)",
-                        }}
-                      />
-                    </td>
-                    <td align="center">
-                      {view === "active" ? (
-                        <>
-                          <button
-                            onClick={() => navigate(`/admin/products/${p.id}/edit`)}
-                            style={{
-                              padding: "4px 12px",
-                              marginRight: 6,
-                              background: "#16a34a",
-                              color: "#fff",
-                              border: 0,
-                              borderRadius: 8,
-                              cursor: "pointer",
-                              fontWeight: 600,
-                            }}
-                          >
-                            Sửa
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => handleRestore(p.id)}
-                            style={{
-                              padding: "4px 12px",
-                              marginRight: 6,
-                              background: "#0ea5e9",
-                              color: "#fff",
-                              border: 0,
-                              borderRadius: 8,
-                              cursor: "pointer",
-                              fontWeight: 600,
-                            }}
-                          >
-                            Khôi phục
-                          </button>
-                          <button
-                            onClick={() => handleForceDelete(p.id)}
-                            style={{
-                              padding: "4px 12px",
-                              background: "#b91c1c",
-                              color: "#fff",
-                              border: 0,
-                              borderRadius: 8,
-                              cursor: "pointer",
-                              fontWeight: 600,
-                            }}
-                          >
-                            Xóa vĩnh viễn
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {!filtered.length && (
-                  <tr>
-                    <td colSpan={9} align="center" style={{ padding: 20, color: "#6b7280" }}>
-                      Không có dữ liệu
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+              {pageNumbers.map((n) => (
+                <button key={n} style={btnNumber(n === page)} onClick={() => gotoPage(n)}>
+                  {n}
+                </button>
+              ))}
 
-          {/* ====== PHÂN TRANG ====== */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              marginTop: 14,
-              background: "rgba(255,255,255,0.9)",
-              borderRadius: 10,
-              padding: "10px 12px",
-              boxShadow: "0 2px 10px rgba(0,0,0,.08)",
-              color: "#111827",
-            }}
-          >
-            <div style={{ fontSize: 14, color: "#111827" }}>
-              Trang <b>{page}</b> / <b>{lastPage}</b> — Tổng: <b>{total}</b>
+              <button style={btnBase(page >= lastPage)} disabled={page >= lastPage} onClick={() => gotoPage(page + 1)}>
+                Next ›
+              </button>
+              <button style={btnBase(page >= lastPage)} disabled={page >= lastPage} onClick={() => gotoPage(lastPage)}>
+                Last »
+              </button>
+
+              <div style={{ color: colors.text, fontSize: 14 }}>
+                Pages <b>{page}</b>/<b>{lastPage}</b> — Total: <b>{total}</b>
+              </div>
             </div>
-
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              <button
-                onClick={() => gotoPage(1)}
-                disabled={page <= 1}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #e5e7eb",
-                  background: page <= 1 ? "#f3f4f6" : "#fff",
-                  cursor: page <= 1 ? "not-allowed" : "pointer",
-                  color: "#111827",
-                }}
-              >
-                « Đầu
-              </button>
-              <button
-                onClick={() => gotoPage(page - 1)}
-                disabled={page <= 1}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #e5e7eb",
-                  background: page <= 1 ? "#f3f4f6" : "#fff",
-                  cursor: page <= 1 ? "not-allowed" : "pointer",
-                  color: "#111827",
-                }}
-              >
-                ‹ Trước
-              </button>
-
-              {pageNumbers.map((n) => {
-                const isActive = n === page;
-                return (
-                  <button
-                    key={n}
-                    onClick={() => gotoPage(n)}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: 8,
-                      border: "1px solid #111827",
-                      background: "#fff",
-                      color: "#111827",
-                      fontWeight: isActive ? 800 : 600,
-                      textDecoration: isActive ? "underline" : "none",
-                    }}
-                  >
-                    {n}
-                  </button>
-                );
-              })}
-
-              <button
-                onClick={() => gotoPage(page + 1)}
-                disabled={page >= lastPage}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #e5e7eb",
-                  background: page >= lastPage ? "#f3f4f6" : "#fff",
-                  cursor: page >= lastPage ? "not-allowed" : "pointer",
-                  color: "#111827",
-                }}
-              >
-                Sau ›
-              </button>
-              <button
-                onClick={() => gotoPage(lastPage)}
-                disabled={page >= lastPage}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #e5e7eb",
-                  background: page >= lastPage ? "#f3f4f6" : "#fff",
-                  cursor: page >= lastPage ? "not-allowed" : "pointer",
-                  color: "#111827",
-                }}
-              >
-                Cuối »
-              </button>
-            </div>
-          </div>
-        </>
+          )}
+        </div>
       )}
-    </section>
+    </div>
   );
 }

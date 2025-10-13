@@ -17,6 +17,7 @@ export default function AddProduct() {
 
   const [form, setForm] = useState({
     name: "",
+    slug: "",
     price_root: "",
     price_sale: "",
     qty: "",
@@ -25,6 +26,8 @@ export default function AddProduct() {
     description: "",
     thumbnail: null,
   });
+  // đánh dấu user đã đụng vào slug (để không auto-ghi đè nữa)
+  const [slugTouched, setSlugTouched] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -57,6 +60,22 @@ export default function AddProduct() {
       .trim()
       .replace(/\s+/g, "-");
 
+  // gõ tên: nếu slug chưa bị user sửa thì tự tạo slug theo tên
+  const onNameChange = (e) => {
+    const value = e.target.value;
+    setForm((s) => ({
+      ...s,
+      name: value,
+      slug: slugTouched ? s.slug : makeSlug(value),
+    }));
+  };
+
+  // user sửa slug bằng tay: slugify ngay & set touched
+  const onSlugChange = (e) => {
+    setSlugTouched(true);
+    setForm((s) => ({ ...s, slug: makeSlug(e.target.value) }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -66,7 +85,7 @@ export default function AddProduct() {
     try {
       const fd = new FormData();
       fd.append("name", form.name);
-      fd.append("slug", makeSlug(form.name));
+      fd.append("slug", form.slug || makeSlug(form.name));
       fd.append("price_root", form.price_root || 0);
       fd.append("price_sale", form.price_sale || 0);
       fd.append("qty", form.qty || 0);
@@ -121,11 +140,27 @@ export default function AddProduct() {
           <input
             name="name"
             value={form.name}
-            onChange={onChange}
+            onChange={onNameChange}
             className="admin-form-control"
             required
           />
           {fieldErrors.name && <small className="admin-form-error-text">{fieldErrors.name[0]}</small>}
+        </div>
+
+        {/* Slug */}
+        <div className="admin-form-field">
+          <label className="admin-form-label">Slug</label>
+          <input
+            name="slug"
+            value={form.slug}
+            onChange={onSlugChange}
+            className="admin-form-control"
+            placeholder="tu-tao-tu-ten-hoac-tu-nhap"
+          />
+          <small style={{ color: "#64748b" }}>
+            URL-friendly, chi gom chu thuong, so va dau gach ngang.
+          </small>
+          {fieldErrors.slug && <small className="admin-form-error-text">{fieldErrors.slug[0]}</small>}
         </div>
 
         <div className="admin-form-grid admin-form-grid--3">
@@ -215,7 +250,6 @@ export default function AddProduct() {
           <div className="admin-upload-preview">
             {form.thumbnail ? (
               typeof form.thumbnail === "string" ? (
-                // Trường hợp sửa sản phẩm và đã có URL ảnh sẵn trong DB
                 <img
                   src={form.thumbnail}
                   alt="Preview"
@@ -223,86 +257,61 @@ export default function AddProduct() {
                   onError={(e) => (e.currentTarget.src = PLACEHOLDER)}
                 />
               ) : (
-                // Trường hợp vừa chọn file từ <input type="file" />
                 <img
                   src={URL.createObjectURL(form.thumbnail)}
                   alt="Preview"
                   className="admin-upload-image"
-                  onLoad={(e) => URL.revokeObjectURL(e.currentTarget.src)} // giải phóng blob sau khi load
+                  onLoad={(e) => URL.revokeObjectURL(e.currentTarget.src)}
                 />
               )
             ) : (
               <div className="admin-upload-placeholder">Chua chon anh</div>
             )}
           </div>
-
           {fieldErrors.thumbnail && <small className="admin-form-error-text">{fieldErrors.thumbnail[0]}</small>}
         </div>
 
         <div className="admin-form-field">
-  <label className="admin-form-label">Mô tả</label>
-
-  <Editor
-    apiKey="wytgyqmbl6rj0c9rw03s5uep2xrd9iit95fmkka5zqb42det" // để trống cũng chạy; có key sẽ tốt hơn
-    value={form.description}
-    onEditorChange={(content) =>
-      setForm((s) => ({ ...s, description: content }))
-    }
-    init={{
-      height: 380,
-      menubar: "file edit view insert format tools table help",
-      plugins:
-        "advlist autolink lists link image charmap preview anchor " +
-        "searchreplace visualblocks code fullscreen " +
-        "insertdatetime media table code help wordcount paste",
-      toolbar:
-        "undo redo | blocks | bold italic underline strikethrough | " +
-        "alignleft aligncenter alignright alignjustify | " +
-        "bullist numlist outdent indent | table | link image media | " +
-        "removeformat | preview code",
-      // Cho dán từ Word giữ định dạng
-      paste_data_images: true,
-      paste_as_text: false,
-
-      // Ảnh: lưu base64 đơn giản (nhanh gọn). Khi cần upload server, đổi sang images_upload_handler phía dưới.
-      automatic_uploads: true,
-      images_file_types: "jpg,jpeg,png,gif,webp",
-      images_upload_handler: (blobInfo, progress) =>
-        new Promise((resolve, reject) => {
-          // ✅ Cách 1 (đơn giản): base64 inline
-          const base64 = "data:" + blobInfo.blob().type + ";base64," + blobInfo.base64();
-          resolve(base64);
-
-          // ❗ Nếu muốn upload lên Laravel: dùng Cách 2, comment Cách 1 và mở Cách 2
-          // // Cách 2: POST lên /api/uploads
-          // const fd = new FormData();
-          // fd.append("file", blobInfo.blob(), blobInfo.filename());
-          // fetch("http://127.0.0.1:8000/api/uploads", { method: "POST", body: fd })
-          //   .then(r => r.json())
-          //   .then(j => resolve(j.url))  // trả về URL public của ảnh
-          //   .catch(() => reject("Upload failed"));
-        }),
-
-      // Font/size giống Word hơn
-      toolbar_sticky: true,
-      branding: false,
-      content_style:
-        "body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6}",
-    }}
-  />
-
-  {fieldErrors.description && (
-    <small className="admin-form-error-text">{fieldErrors.description[0]}</small>
-  )}
-</div>
-
+          <label className="admin-form-label">Mo ta</label>
+          <Editor
+            apiKey="wytgyqmbl6rj0c9rw03s5uep2xrd9iit95fmkka5zqb42det"
+            value={form.description}
+            onEditorChange={(content) => setForm((s) => ({ ...s, description: content }))}
+            init={{
+              height: 380,
+              menubar: "file edit view insert format tools table help",
+              plugins:
+                "advlist autolink lists link image charmap preview anchor " +
+                "searchreplace visualblocks code fullscreen " +
+                "insertdatetime media table code help wordcount paste",
+              toolbar:
+                "undo redo | blocks | bold italic underline strikethrough | " +
+                "alignleft aligncenter alignright alignjustify | " +
+                "bullist numlist outdent indent | table | link image media | " +
+                "removeformat | preview code",
+              paste_data_images: true,
+              paste_as_text: false,
+              automatic_uploads: true,
+              images_file_types: "jpg,jpeg,png,gif,webp",
+              images_upload_handler: (blobInfo) =>
+                new Promise((resolve) => {
+                  const base64 =
+                    "data:" + blobInfo.blob().type + ";base64," + blobInfo.base64();
+                  resolve(base64);
+                }),
+              toolbar_sticky: true,
+              branding: false,
+              content_style:
+                "body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6}",
+            }}
+          />
+          {fieldErrors.description && (
+            <small className="admin-form-error-text">{fieldErrors.description[0]}</small>
+          )}
+        </div>
 
         <div className="admin-form-actions">
-          <button
-            type="submit"
-            disabled={saving}
-            className="admin-btn admin-btn--primary"
-          >
+          <button type="submit" disabled={saving} className="admin-btn admin-btn--primary">
             {saving ? "Dang luu..." : "Luu"}
           </button>
           <button

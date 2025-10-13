@@ -96,6 +96,9 @@ export default function AdminSidebar() {
         <NavLink to="/admin/products" style={linkStyle}>
           Products
         </NavLink>
+        <NavLink to="/admin/inventories" style={linkStyle}>
+          Inventories
+        </NavLink>
         <NavLink to="/admin/categories" style={linkStyle}>
           Categories
         </NavLink>
