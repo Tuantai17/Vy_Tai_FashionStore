@@ -11,6 +11,9 @@ use App\Models\Payment;
 use App\Http\Controllers\Api\ProductImportController;
 use App\Http\Controllers\Api\InventoryController;
 
+
+
+
 // use App\Http\Controllers\Api\WishlistController;
 
 use App\Http\Controllers\Api\{
@@ -20,7 +23,8 @@ use App\Http\Controllers\Api\{
     AuthController,
     OrderController,
     UserController,
-    ReviewController
+    ReviewController,
+    AdminDashboardController
 };
 // import products from CSV
 
