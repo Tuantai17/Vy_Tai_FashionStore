@@ -11,10 +11,7 @@ use App\Models\Payment;
 use App\Http\Controllers\Api\ProductImportController;
 use App\Http\Controllers\Api\InventoryController;
 
-use App\Http\Controllers\WishlistController;
-
-
-// use App\Http\Controllers\Api\WishlistController;
+use App\Http\Controllers\Api\WishlistController;
 
 use App\Http\Controllers\Api\{
     ProductController,

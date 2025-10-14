@@ -19,7 +19,7 @@ import Contact from "./pages/Customers/Contact";
 import MyOrders from "./pages/Customers/MyOrders";
 import OrderTracking from "./pages/Customers/OrderTracking";
 import ReviewSection from "./pages/Customers/ReviewSection";
-// import Wishlist from "./pages/Customers/Wishlist";
+import Wishlist from "./pages/Customers/Wishlist";
 
 // ===== Admin pages/layout =====
 import AdminLayout from "./layouts/AdminLayout";
@@ -46,7 +46,7 @@ import Settings from "./pages/Admin/Settings/Settings.jsx";
 
 
 
-// ---- Hàm logout (giữ nguyên) ----
+// ---- Hàm logout (gi? nguyên) ----
 const handleLogout = async () => {
   const token = localStorage.getItem("token");
   try {
@@ -70,7 +70,7 @@ const handleLogout = async () => {
   }
 };
 
-// === Menu user (giữ nguyên) ===
+// === Menu user (gi? nguyên) ===
 function UserMenu({ user, onLogout }) {
   const [open, setOpen] = React.useState(false);
   const navigate = useNavigate();
@@ -177,7 +177,7 @@ function UserMenu({ user, onLogout }) {
             )}
             <div style={{ minWidth: 0 }}>
               <div style={{ fontWeight: 700, lineHeight: 1.2, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {user?.name || "Tài khoản"}
+                {user?.name || "Tài kho?n"}
               </div>
               <div style={{ fontSize: 13, color: "#6b7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {user?.email}
@@ -202,8 +202,8 @@ function UserMenu({ user, onLogout }) {
                 <path d="M9 7V5a3 3 0 0 1 6 0v2" stroke="currentColor" strokeWidth="1.5"/>
               </svg>
               <div style={{ lineHeight: 1.1 }}>
-                <div style={{ fontWeight: 600 }}>Đơn hàng của tôi</div>
-                <div style={{ fontSize: 12, color: "#6b7280" }}>Xem toàn bộ đơn đã đặt</div>
+                <div style={{ fontWeight: 600 }}>Ðon hàng c?a tôi</div>
+                <div style={{ fontSize: 12, color: "#6b7280" }}>Xem toàn b? don dã d?t</div>
               </div>
             </div>
 
@@ -221,7 +221,7 @@ function UserMenu({ user, onLogout }) {
                 <path d="M11 8l-4 4 4 4" stroke="currentColor" strokeWidth="1.5" />
                 <path d="M21 4v16a2 2 0 0 1-2 2h-6" stroke="currentColor" strokeWidth="1.5" />
               </svg>
-              <span style={{ fontWeight: 600 }}>Đăng xuất</span>
+              <span style={{ fontWeight: 600 }}>Ðang xu?t</span>
             </div>
           </div>
         </div>
@@ -235,7 +235,7 @@ function UserMenu({ user, onLogout }) {
   );
 }
 
-// ---- Layout cho phần khách hàng ----
+// ---- Layout cho ph?n khách hàng ----
 function Layout({ children }) {
   const user = JSON.parse(localStorage.getItem("user") || "null");
 
@@ -254,12 +254,12 @@ function Layout({ children }) {
         </div>
 
 
-        {/* Bên phải: icon giỏ HÌNH TRÒN + user */}
+        {/* Bên ph?i: icon gi? HÌNH TRÒN + user */}
         <div className="flex items-center gap-3">
           <NavLink
             to="/"
             id="home-target"
-            title="Trang chủ"
+            title="Trang ch?"
             style={{
               width: 33,
               height: 33,
@@ -272,15 +272,15 @@ function Layout({ children }) {
               backgroundRepeat: "no-repeat",
               marginRight: 10,
 
-              /* ✅ Nằm NGANG với avatar: dịch nhẹ xuống để tâm trùng tâm vòng tròn user */
-              transform: "translateY(12px)", // nếu vẫn lệch, bạn chỉnh 8–10px cho vừa mắt
+              /* ? N?m NGANG v?i avatar: d?ch nh? xu?ng d? tâm trùng tâm vòng tròn user */
+              transform: "translateY(12px)", // n?u v?n l?ch, b?n ch?nh 8–10px cho v?a m?t
             }}
           />
 
           <NavLink
             to="/products"
             id="product-target"
-            title="Sản phẩm"
+            title="S?n ph?m"
             style={{
               width: 33,
               height: 33,
@@ -293,16 +293,16 @@ function Layout({ children }) {
               backgroundRepeat: "no-repeat",
               marginRight: 10,
 
-              /* ✅ Nằm NGANG với avatar: dịch nhẹ xuống để tâm trùng tâm vòng tròn user */
-              transform: "translateY(12px)", // nếu vẫn lệch, bạn chỉnh 8–10px cho vừa mắt
+              /* ? N?m NGANG v?i avatar: d?ch nh? xu?ng d? tâm trùng tâm vòng tròn user */
+              transform: "translateY(12px)", // n?u v?n l?ch, b?n ch?nh 8–10px cho v?a m?t
             }}
           />
 
-          {/* ✅ Icon giỏ hàng tròn, cùng size avatar, làm đích để bay */}
+          {/* ? Icon gi? hàng tròn, cùng size avatar, làm dích d? bay */}
           <NavLink
             to="/cart"
             id="cart-target"
-            title="Giỏ hàng"
+            title="Gi? hàng"
             style={{
               width: 33,
               height: 33,
@@ -315,15 +315,15 @@ function Layout({ children }) {
               backgroundRepeat: "no-repeat",
               marginRight: 10,
 
-              /* ✅ Nằm NGANG với avatar: dịch nhẹ xuống để tâm trùng tâm vòng tròn user */
-              transform: "translateY(12px)", // nếu vẫn lệch, bạn chỉnh 8–10px cho vừa mắt
+              /* ? N?m NGANG v?i avatar: d?ch nh? xu?ng d? tâm trùng tâm vòng tròn user */
+              transform: "translateY(12px)", // n?u v?n l?ch, b?n ch?nh 8–10px cho v?a m?t
             }}
           />
 
-          {/* <NavLink
+          <NavLink
             to="/wishlist"
             id="wishlist-target"
-            title="Yêu thích"
+            title="Yeu thich"
             style={{
               width: 33,
               height: 33,
@@ -338,13 +338,13 @@ function Layout({ children }) {
 
               transform: "translateY(12px)", 
             }}
-          /> */}
+          />
 
          
           <NavLink
             to="/contact"
             id="contact-target"
-            title="Liên hệ"
+            title="Liên h?"
             style={{
               width: 33,
               height: 33,
@@ -357,17 +357,17 @@ function Layout({ children }) {
               backgroundRepeat: "no-repeat",
               marginRight: 10,
 
-              /* ✅ Nằm NGANG với avatar: dịch nhẹ xuống để tâm trùng tâm vòng tròn user */
-              transform: "translateY(12px)", // nếu vẫn lệch, bạn chỉnh 8–10px cho vừa mắt
+              /* ? N?m NGANG v?i avatar: d?ch nh? xu?ng d? tâm trùng tâm vòng tròn user */
+              transform: "translateY(12px)", // n?u v?n l?ch, b?n ch?nh 8–10px cho v?a m?t
             }}
           />
 
 
-          {/* Tin tức */}
+          {/* Tin t?c */}
           <NavLink
             to="/news"
             id="news-target"
-            title="Tin tức"
+            title="Tin t?c"
             className={({ isActive }) => (isActive ? "ring-2 ring-black" : "")}
             style={{
               width: 33,
@@ -375,7 +375,7 @@ function Layout({ children }) {
               borderRadius: "50%",
               border: "1px solid #d1d5db",
               display: "inline-block",
-              backgroundImage: "url('http://127.0.0.1:8000/assets/images/news.jpg')", // đổi tên file nếu khác
+              backgroundImage: "url('http://127.0.0.1:8000/assets/images/news.jpg')", // d?i tên file n?u khác
               backgroundSize: "cover",
               backgroundPosition: "center",
               backgroundRepeat: "no-repeat",
@@ -384,13 +384,13 @@ function Layout({ children }) {
             }}
           />
 
-          {/* User / Logout giữ nguyên */}
+          {/* User / Logout gi? nguyên */}
           {user ? (
             <UserMenu user={user} onLogout={handleLogout} />
           ) : (
             <>
-              <NavLink to="/register" className="hover:underline">Đăng ký</NavLink>
-              <NavLink to="/login" className="hover:underline">Đăng nhập</NavLink>
+              <NavLink to="/register" className="hover:underline">Ðang ký</NavLink>
+              <NavLink to="/login" className="hover:underline">Ðang nh?p</NavLink>
             </>
           )}
         </div>
@@ -402,10 +402,13 @@ function Layout({ children }) {
         © {new Date().getFullYear()} StoreVegetables
       </footer>
 
-      {/* ✅ Nháy icon giỏ khi thêm hàng */}
+      {/* ? Nháy icon gi? khi thêm hàng */}
       <style>{`
         #cart-target.cart-pulse { 
           animation: cartPulse .6s ease; 
+        }
+        #wishlist-target.wishlist-pulse {
+          animation: cartPulse .6s ease;
         }
         @keyframes cartPulse {
           0% { transform: scale(1); filter: none; }
@@ -418,7 +421,7 @@ function Layout({ children }) {
 }
 
 function App() {
-  // Lưu/khôi phục giỏ hàng (giữ nguyên)
+  // Luu/khôi ph?c gi? hàng (gi? nguyên)
   const [cart, setCart] = useState(() => {
     const saved = localStorage.getItem("cart");
     return saved ? JSON.parse(saved) : [];
@@ -428,7 +431,7 @@ function App() {
     localStorage.setItem("cart", JSON.stringify(cart));
   }, [cart]);
 
-  // Merge từ “Mua lại” (giữ nguyên)
+  // Merge t? “Mua l?i” (gi? nguyên)
   useEffect(() => {
     const onMerge = (e) => {
       const items = Array.isArray(e.detail) ? e.detail : [];
@@ -462,7 +465,7 @@ function App() {
     return () => window.removeEventListener("cart:merge", onMerge);
   }, []);
 
-  // Thêm 1 sp (giữ nguyên, có nháy icon)
+  // Thêm 1 sp (gi? nguyên, có nháy icon)
   const addToCart = (product, { silent = false } = {}) => {
     setCart((prev) => {
       const idx = prev.findIndex((i) => i.id === product.id);
@@ -501,7 +504,7 @@ function App() {
         <Route path="/contact" element={<Layout><Contact /></Layout>} />
         <Route path="/track" element={<OrderTracking />} />
         <Route path="/me/orders" element={<Layout><MyOrders /></Layout>} />
-        {/* <Route path="/wishlist" element={<Layout><Wishlist /></Layout>} /> */}
+        <Route path="/wishlist" element={<Layout><Wishlist /></Layout>} />
 
 
         {/* Admin */}
@@ -539,10 +542,13 @@ function App() {
           <Route path="settings" element={<Settings />} />
         </Route>
 
-        <Route path="*" element={<Layout><div>Không tìm thấy trang</div></Layout>} />
+        <Route path="*" element={<Layout><div>Không tìm th?y trang</div></Layout>} />
       </Routes>
     </BrowserRouter>
   );
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+
+

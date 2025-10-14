@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { wishlistList, wishlistRemove, wishlistToggle } from "../../lib/api";
+import { wishlistList, wishlistRemove, wishlistToggle } from "../../lib/wishlist";
 import { FaTrash, FaHeart } from "react-icons/fa";
 
 const PLACEHOLDER = "https://placehold.co/300x200?text=No+Image";
@@ -22,6 +22,22 @@ export default function Wishlist() {
       } finally { setLoading(false); }
     })();
   }, [token, navigate]);
+
+  useEffect(() => {
+    const onWishlistUpdated = async (event) => {
+      if (!token) return;
+      const detail = event?.detail || {};
+      if (detail.liked === undefined) return;
+      try {
+        const data = await wishlistList();
+        setItems(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error("wishlist refresh error:", e);
+      }
+    };
+    window.addEventListener("wishlist:updated", onWishlistUpdated);
+    return () => window.removeEventListener("wishlist:updated", onWishlistUpdated);
+  }, [token]);
 
   const handleRemove = async (pid) => {
     try {

@@ -8,10 +8,10 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        Schema::create('wishlists', function (Blueprint $table) {
+        Schema::create('nqtv_wishlist', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained('nqtv_user')->cascadeOnDelete();
+            $table->foreignId('product_id')->constrained('nqtv_product')->cascadeOnDelete();
             $table->timestamps();
 
             $table->unique(['user_id', 'product_id']);
@@ -19,6 +19,6 @@ return new class extends Migration {
     }
     public function down(): void
     {
-        Schema::dropIfExists('wishlists');
+        Schema::dropIfExists('nqtv_wishlist');
     }
 };

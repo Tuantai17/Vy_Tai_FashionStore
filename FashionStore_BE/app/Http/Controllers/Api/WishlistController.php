@@ -1,8 +1,8 @@
 <?php
 
-// app/Http/Controllers/WishlistController.php
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Controller;
 use App\Models\Wishlist;
 use App\Models\Product;
 use Illuminate\Http\Request;
@@ -20,11 +20,12 @@ class WishlistController extends Controller
             ->get()
             ->map(function ($w) {
                 $p = $w->product;
+                $price = (float) ($p?->price_sale ?? $p?->price_root ?? 0);
                 return [
                     'wishlist_id' => $w->id,
                     'id'          => $p->id,
                     'name'        => $p->name,
-                    'price'       => $p->price,
+                    'price'       => $price,
                     'image'       => $p->image ?? $p->thumbnail_url ?? null,
                     'category_name' => optional($p->category)->name,
                     'brand_name'    => optional($p->brand)->name,
@@ -38,7 +39,7 @@ class WishlistController extends Controller
     // POST /api/wishlist/toggle {product_id}
     public function toggle(Request $request)
     {
-        $request->validate(['product_id' => 'required|exists:products,id']);
+        $request->validate(['product_id' => 'required|exists:nqtv_product,id']);
         $user = $request->user();
         $pid  = (int) $request->product_id;
 
