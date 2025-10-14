@@ -51,7 +51,6 @@
 
 
 
-
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -60,23 +59,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use App\Models\Product;
-
-
+use App\Models\Wishlist;
 
 class ProductController extends Controller
 {
-    // ====================== PUBLIC LIST ======================
-    // public function index()
-    // {
-    //     $products = Product::with('brand:id,name')
-    //         ->select(['id', 'name', 'brand_id', 'price_sale as price', 'thumbnail'])
-    //         ->latest('id')
-    //         ->paginate(12);
-
-    //     // Ẩn brand_id nếu không muốn lộ schema nội bộ
-    //     return $products->makeHidden(['brand', 'brand_id']);
-    // }
-
     // ====================== PUBLIC LIST ======================
     public function index(Request $request)
     {
@@ -87,21 +73,34 @@ class ProductController extends Controller
         $perPage = (int) $request->query('per_page', 12);
         $all     = $request->boolean('all') || $perPage === -1;
 
+        // ✅ Preload tất cả product_id mà user hiện tại đã "thích" (nếu có)
+        $likedIds = $request->user()
+            ? Wishlist::where('user_id', $request->user()->id)->pluck('product_id')->all()
+            : [];
+
         if ($all) {
             $items = $query->get();
-            // Ẩn khóa nội bộ; nếu Model có appends (thumbnail_url, brand_name, category_name) thì FE dùng trực tiếp
-            return $items->makeHidden(['brand', 'brand_id', 'category', 'category_id']);
+            $items->transform(function ($m) use ($likedIds) {
+                // gắn cờ đã thích
+                $m->setAttribute('is_liked', in_array($m->id, $likedIds));
+                // ẩn khóa nội bộ
+                return $m->makeHidden(['brand', 'brand_id', 'category', 'category_id']);
+            });
+            return response()->json($items);
         }
 
         $perPage = $perPage > 0 ? $perPage : 12;
+
         $paginator = $query->paginate($perPage);
-        $paginator->getCollection()->transform(
-            fn($m) => $m->makeHidden(['brand', 'brand_id', 'category', 'category_id'])
-        );
+        $paginator->getCollection()->transform(function ($m) use ($likedIds) {
+            $m->setAttribute('is_liked', in_array($m->id, $likedIds));
+            return $m->makeHidden(['brand', 'brand_id', 'category', 'category_id']);
+        });
 
         return response()->json($paginator);
     }
 
+    // ====================== PUBLIC LIST BY CATEGORY ======================
     public function byCategory(Request $request, $id)
     {
         $query = Product::with(['brand:id,name', 'category:id,name'])
@@ -123,21 +122,32 @@ class ProductController extends Controller
         $perPage = (int) $request->query('per_page', 12);
         $all     = $request->boolean('all') || $perPage === -1;
 
+        // ✅ Preload likedIds của user (nếu có)
+        $likedIds = $request->user()
+            ? Wishlist::where('user_id', $request->user()->id)->pluck('product_id')->all()
+            : [];
+
         if ($all) {
             $items = $query->get();
-            return $items->makeHidden(['brand', 'brand_id', 'category', 'category_id']);
+            $items->transform(function ($m) use ($likedIds) {
+                $m->setAttribute('is_liked', in_array($m->id, $likedIds));
+                return $m->makeHidden(['brand', 'brand_id', 'category', 'category_id']);
+            });
+            return response()->json($items);
         }
 
         if ($perPage <= 0) $perPage = 12;
 
         $paginator = $query->paginate($perPage);
-        $paginator->getCollection()->transform(
-            fn($m) => $m->makeHidden(['brand', 'brand_id', 'category', 'category_id'])
-        );
+        $paginator->getCollection()->transform(function ($m) use ($likedIds) {
+            $m->setAttribute('is_liked', in_array($m->id, $likedIds));
+            return $m->makeHidden(['brand', 'brand_id', 'category', 'category_id']);
+        });
 
         return response()->json($paginator);
     }
 
+    // ====================== PUBLIC SHOW (DETAIL) ======================
     public function show($id)
     {
         $p = Product::with(['brand:id,name', 'category:id,name'])
@@ -161,7 +171,7 @@ class ProductController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        // Vá trường hợp mô tả lỗi UTF-8 (hiếm khi gặp)
+        // Vá trường hợp mô tả lỗi UTF-8 (hiếm)
         if (!is_null($p->description) && !mb_check_encoding($p->description, 'UTF-8')) {
             $p->description = mb_convert_encoding($p->description, 'UTF-8', 'auto');
         }
@@ -169,14 +179,22 @@ class ProductController extends Controller
             $p->detail = mb_convert_encoding($p->detail, 'UTF-8', 'auto');
         }
 
-        $payload = $p->makeHidden(['brand', 'brand_id', 'category'])
-            ->append(['thumbnail_url', 'brand_name', 'category_name']);
+        // ✅ Tính is_liked cho user hiện tại
+        $user = request()->user();
+        $isLiked = $user
+            ? Wishlist::where('user_id', $user->id)->where('product_id', $p->id)->exists()
+            : false;
 
-        // ✅ Không escape Unicode/Slash để tránh 500 khi có HTML & ký tự tiếng Việt
+        // Tạo payload như cũ + chèn is_liked
+        $payload = $p->makeHidden(['brand', 'brand_id', 'category'])
+            ->append(['thumbnail_url', 'brand_name', 'category_name'])
+            ->toArray();
+
+        $payload['is_liked'] = $isLiked;
+
+        // Không escape Unicode/Slash để tránh lỗi khi có HTML & tiếng Việt
         return response()->json($payload, 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
-
-
 
     // ====================== ADMIN LIST ======================
     public function adminIndex(Request $request)
@@ -186,22 +204,23 @@ class ProductController extends Controller
             ->latest('id');
 
         $perPage = (int) $request->query('per_page', 10);
+
         if ($request->boolean('all') || $perPage === -1) {
             // Trả full list (không phân trang) khi yêu cầu all
             $items = $query->get();
             $items->transform(fn($m) => $m->makeHidden(['brand', 'brand_id']));
             return response()->json($items);
         }
+
         if ($perPage <= 0) $perPage = 10;
 
-        // ⬇️ Quan trọng: paginate + transform collection bên trong
+        // ⬇️ paginate + transform collection bên trong
         $paginator = $query->paginate($perPage);
         $paginator->getCollection()->transform(fn($m) => $m->makeHidden(['brand', 'brand_id']));
 
         // Trả paginator để FE đọc được current_page, last_page, total...
         return response()->json($paginator);
     }
-
 
     // ====================== CREATE ======================
     public function store(Request $req)
@@ -245,8 +264,8 @@ class ProductController extends Controller
             'detail'      => $data['detail']      ?? null,
         ];
 
-        // Nếu DB có cột created_by/updated_by KHÔNG default -> gán vào (không lỗi nếu DB không có cột)
-        $userId = Auth::id() ?? 1; // tuỳ hệ thống auth của bạn
+        // Nếu DB có cột created_by/updated_by KHÔNG default -> gán (không lỗi nếu DB không có cột)
+        $userId = Auth::id() ?? 1;
         if (schema_has_column('nqtv_product', 'created_by')) $payload['created_by'] = $userId;
         if (schema_has_column('nqtv_product', 'updated_by')) $payload['updated_by'] = $userId;
 
@@ -290,9 +309,7 @@ class ProductController extends Controller
             'brand_id'    => $validated['brand_id'],
             'description' => $validated['description'] ?? null,
             'status'      => $validated['status'] ?? 1,
-            'updated_by'  => \Illuminate\Support\Facades\Auth::id(),
-            // 'updated_by'  => auth()->id(),
-
+            'updated_by'  => Auth::id(),
         ]);
 
         // Nếu upload ảnh mới
@@ -312,7 +329,7 @@ class ProductController extends Controller
         ]);
     }
 
-    // ====================== DELETE ======================
+    // ====================== DELETE (SOFT) ======================
     public function destroy($id)
     {
         $p = Product::find($id);
@@ -320,14 +337,9 @@ class ProductController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        // Nếu bạn muốn xoá file ảnh khỏi storage
-        // if ($p->thumbnail && Storage::disk('public')->exists($p->thumbnail)) {
-        //     Storage::disk('public')->delete($p->thumbnail);
-        // }
+        // Nếu muốn xoá file ảnh khỏi storage khi xoá vĩnh viễn, làm ở forceDestroy
 
-
-
-        $p->delete(); // => soft delete
+        $p->delete(); // soft delete
         return response()->json(['message' => 'Soft deleted']);
     }
 
@@ -379,7 +391,7 @@ class ProductController extends Controller
     }
 }
 
-
+// ====================== HELPER ======================
 if (!function_exists('schema_has_column')) {
     function schema_has_column(string $table, string $column): bool
     {

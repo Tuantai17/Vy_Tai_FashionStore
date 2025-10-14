@@ -1,16 +1,52 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { FaHeart, FaRegHeart } from "react-icons/fa";
+import { useState } from "react";
 
 const PLACEHOLDER = "https://placehold.co/300x200?text=No+Image";
 
 export default function ProductCard({ p }) {
   const price = Number(p.price) || 0;
   const imgSrc = p.image || p.thumbnail_url || p.thumbnail || PLACEHOLDER;
+  const navigate = useNavigate();
 
-  // tên danh mục (nhiều kiểu dữ liệu)
+  // trạng thái yêu thích ban đầu
+  const [liked, setLiked] = useState(p.is_liked || false);
+  const token = localStorage.getItem("token");
+
+  // tên danh mục
   const categoryName =
     p.category_name ||
     (p.category && typeof p.category === "object" ? p.category.name : null) ||
     (typeof p.category === "string" ? p.category : null);
+
+  // Hàm toggle yêu thích
+  const handleToggleWishlist = async (e) => {
+    e.preventDefault(); // tránh chuyển trang khi click icon
+
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/wishlist/toggle", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ product_id: p.id }),
+      });
+
+      if (res.ok) {
+        setLiked((prev) => !prev);
+      } else {
+        console.error("Lỗi toggle wishlist:", await res.text());
+      }
+    } catch (err) {
+      console.error("Lỗi kết nối wishlist:", err);
+    }
+  };
 
   return (
     <>
@@ -27,14 +63,22 @@ export default function ProductCard({ p }) {
           .product-image__img{ position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .25s ease; }
           .product-card:hover .product-image__img{ transform:scale(1.04); }
 
-          .product-info{ display:flex;flex-direction:column;gap:6px;padding:12px;flex:1;min-height:0; }
+          .wishlist-btn{
+            position:absolute;top:8px;right:8px;
+            background:rgba(255,255,255,0.9);
+            border-radius:50%;padding:6px;
+            display:flex;align-items:center;justify-content:center;
+            cursor:pointer;transition:transform .2s;
+          }
+          .wishlist-btn:hover{ transform:scale(1.1); }
 
-          .name{
-            font-size:15px;font-weight:600;color:#111;line-height:1.4;
+          .wishlist-icon{ font-size:20px; color:#ccc; }
+          .wishlist-icon.liked{ color:#e53935; }
+
+          .product-info{ display:flex;flex-direction:column;gap:6px;padding:12px;flex:1;min-height:0; }
+          .name{ font-size:15px;font-weight:600;color:#111;line-height:1.4;
             display:-webkit-box;-webkit-box-orient: vertical;-webkit-line-clamp: 2;overflow:hidden;height:2.8em;
           }
-
-          /* ====== dòng danh mục (nằm TRÊN) ====== */
           .category-chip{
             display:inline-block;
             font-size:12px;
@@ -46,13 +90,9 @@ export default function ProductCard({ p }) {
             max-width:100%;
             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
           }
-
-          /* ====== dòng thương hiệu (nằm DƯỚI danh mục) ====== */
-          .brand{
-            font-size:13px;color:#6b7280;
+          .brand{ font-size:13px;color:#6b7280;
             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
           }
-
           .price{ margin-top:auto;font-weight:700;font-size:15px;color:#2e7d32; }
         `}
       </style>
@@ -67,18 +107,21 @@ export default function ProductCard({ p }) {
               loading="lazy"
               onError={(e) => { e.currentTarget.src = PLACEHOLDER; }}
             />
+            {/* Biểu tượng yêu thích */}
+            <div className="wishlist-btn" onClick={handleToggleWishlist}>
+              {liked ? (
+                <FaHeart className="wishlist-icon liked" />
+              ) : (
+                <FaRegHeart className="wishlist-icon" />
+              )}
+            </div>
           </div>
 
           <div className="product-info">
             <div className="name">{p.name}</div>
-
-            {/* Hàng 1: Danh mục */}
             {categoryName && <span className="category-chip">{categoryName}</span>}
-
-            {/* Hàng 2: Thương hiệu */}
             <div className="brand">{p.brand_name ? p.brand_name : "Farm Local"}</div>
-
-            <div className="price">₫{(price || 0).toLocaleString("vi-VN")}</div>
+            <div className="price">₫{price.toLocaleString("vi-VN")}</div>
           </div>
         </Link>
       </div>

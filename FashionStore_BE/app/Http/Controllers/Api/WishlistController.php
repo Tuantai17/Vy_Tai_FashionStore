@@ -1,70 +1,70 @@
 <?php
 
-// namespace App\Http\Controllers\Api;
+// app/Http/Controllers/WishlistController.php
+namespace App\Http\Controllers;
 
-// use App\Http\Controllers\Controller;
-// use Illuminate\Http\Request;
-// use App\Models\Wishlist;
-// use Illuminate\Support\Facades\Log;
-// use Illuminate\Support\Facades\DB;
-// use Illuminate\Validation\Rule;
+use App\Models\Wishlist;
+use App\Models\Product;
+use Illuminate\Http\Request;
 
-// class WishlistController extends Controller
-// {
-//     public function index(Request $r)
-//     {
-//         $user = $r->user(); // tương đương Auth::user() nhưng theo guard hiện tại
-//         return Wishlist::with('product')
-//             ->where('user_id', $user->id)
-//             ->get();
-//     }
+class WishlistController extends Controller
+{
+    // GET /api/wishlist
+    public function index(Request $request)
+    {
+        $user = $request->user();
 
-//     public function toggle(Request $r)
-//     {
-//        Log::info('WL debug', [
-//             'pid'    => $r->product_id,
-//             'db'     => DB::connection()->getDatabaseName(),
-//             'exists' => DB::table('nqtv_product')->where('id', $r->product_id)->exists(),
-//             'last3'  => DB::table('nqtv_product')->select('id','name')->orderByDesc('id')->limit(3)->get(),
-//         ]);
+        $items = Wishlist::with(['product.category', 'product.brand'])
+            ->where('user_id', $user->id)
+            ->latest()
+            ->get()
+            ->map(function ($w) {
+                $p = $w->product;
+                return [
+                    'wishlist_id' => $w->id,
+                    'id'          => $p->id,
+                    'name'        => $p->name,
+                    'price'       => $p->price,
+                    'image'       => $p->image ?? $p->thumbnail_url ?? null,
+                    'category_name' => optional($p->category)->name,
+                    'brand_name'    => optional($p->brand)->name,
+                    'is_liked'    => true, // trên trang wishlist luôn là true
+                ];
+            });
 
-//         // 1) validate vào thẳng DB
-//         $r->validate([
-//             'product_id' => [
-//                 'required',
-//                 'integer',
-//                 'min:1',
-//                 // bỏ comment nếu có soft delete và muốn bỏ qua sp đã xoá mềm
-//                 // Rule::exists('nqtv_product','id')->whereNull('deleted_at'),
-//                 Rule::exists('nqtv_product', 'id'),
-//             ],
-//         ]);
+        return response()->json($items);
+    }
 
-//         // 2) bắt buộc phải có user (nếu null trả 401, khỏi dính lỗi 500)
-//         $user = $r->user();
-//         if (!$user) {
-//             return response()->json(['message' => 'Unauthenticated'], 401);
-//         }
+    // POST /api/wishlist/toggle {product_id}
+    public function toggle(Request $request)
+    {
+        $request->validate(['product_id' => 'required|exists:products,id']);
+        $user = $request->user();
+        $pid  = (int) $request->product_id;
 
-//         try {
-//             $row = Wishlist::where('user_id', $user->id)
-//                 ->where('product_id', $r->product_id)
-//                 ->first();
+        $existing = Wishlist::where('user_id', $user->id)->where('product_id', $pid)->first();
 
-//             if ($row) {
-//                 $row->delete();
-//                 return response()->json(['liked' => false]);
-//             }
+        if ($existing) {
+            $existing->delete();
+            return response()->json(['message' => 'Removed']);
+        }
 
-//             Wishlist::create([
-//                 'user_id'    => $user->id,
-//                 'product_id' => $r->product_id,
-//             ]);
+        Wishlist::create(['user_id' => $user->id, 'product_id' => $pid]);
+        return response()->json(['message' => 'Added']);
+    }
 
-//             return response()->json(['liked' => true]);
-//         } catch (\Throwable $e) {
-//             Log::error('wishlist.toggle: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-//             return response()->json(['message' => 'Server Error'], 500);
-//         }
-//     }
-// }
+    // DELETE /api/wishlist/{product}
+    public function destroy(Request $request, Product $product)
+    {
+        $user = $request->user();
+        Wishlist::where('user_id', $user->id)->where('product_id', $product->id)->delete();
+        return response()->json(['message' => 'Removed']);
+    }
+
+    // (tuỳ chọn) GET /api/wishlist/count
+    public function count(Request $request)
+    {
+        $c = Wishlist::where('user_id', $request->user()->id)->count();
+        return response()->json(['count' => $c]);
+    }
+}

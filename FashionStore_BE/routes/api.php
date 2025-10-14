@@ -11,7 +11,7 @@ use App\Models\Payment;
 use App\Http\Controllers\Api\ProductImportController;
 use App\Http\Controllers\Api\InventoryController;
 
-
+use App\Http\Controllers\WishlistController;
 
 
 // use App\Http\Controllers\Api\WishlistController;
@@ -102,10 +102,18 @@ Route::post('/products/{id}/reviews', [ReviewController::class, 'store'])->middl
 Route::put('/reviews/{id}', [ReviewController::class, 'update'])->middleware('auth:sanctum');
 Route::delete('/reviews/{id}', [ReviewController::class, 'destroy'])->middleware('auth:sanctum');
 
-// Route::middleware('auth:sanctum')->group(function () {
-//     Route::get('/wishlist', [WishlistController::class, 'index']);
-//     Route::post('/wishlist/toggle', [WishlistController::class, 'toggle']);
-// });
+
+
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('wishlist', [WishlistController::class, 'index']);
+    Route::get('wishlist/count', [WishlistController::class, 'count']); // tuỳ chọn
+    Route::post('wishlist/toggle', [WishlistController::class, 'toggle']);
+    Route::delete('wishlist/{product}', [WishlistController::class, 'destroy']);
+});
+
+
+
 
 // ===== Products =====
 Route::get('/products',      [ProductController::class, 'index']);
