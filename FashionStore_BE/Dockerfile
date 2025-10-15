@@ -1,21 +1,29 @@
-# Dockerfile cho Laravel (Render)
-FROM php:8.2-fpm
+# Runtime PHP
+FROM php:8.3-cli-alpine
 
-# Cài các extension cần thiết
-RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    unzip \
-    git \
-    && docker-php-ext-install pdo pdo_pgsql
+# Cài các lib cần cho gd + zip + pdo_mysql
+RUN apk add --no-cache \
+    libpng-dev libjpeg-turbo-dev freetype-dev \
+    oniguruma-dev libzip-dev zip git
 
-# Cài Composer
+# Enable extensions
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) gd pdo pdo_mysql zip
+
+# Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
 COPY . .
 
-RUN composer install --no-dev --optimize-autoloader
-RUN php artisan key:generate --force || true
-RUN php artisan optimize:clear
+# Cài dependency & optimize
+RUN composer install --no-dev --optimize-autoloader \
+    && php artisan key:generate --force || true \
+    && php artisan optimize:clear \
+    && php artisan config:cache \
+    && php artisan route:cache \
+    && php artisan view:cache
 
-CMD php artisan migrate --force && php -S 0.0.0.0:$PORT -t public
+# Expose và start
+EXPOSE 8080
+CMD php artisan serve --host 0.0.0.0 --port ${PORT:-8080}
