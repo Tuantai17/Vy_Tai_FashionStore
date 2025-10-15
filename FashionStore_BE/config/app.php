@@ -26,6 +26,10 @@ return [
     |
     */
 
+    'artisan_key' => env('APP_ARTISAN_KEY'),
+
+
+
     'env' => env('APP_ENV', 'production'),
 
     /*
