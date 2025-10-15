@@ -20,6 +20,14 @@ return [
 
     'driver' => env('SESSION_DRIVER', 'database'),
 
+
+    'domain' => env('SESSION_DOMAIN', null),
+    'secure' => env('SESSION_SECURE_COOKIE', false),
+    'same_site' => env('SESSION_SAME_SITE', 'lax'),
+
+
+
+
     /*
     |--------------------------------------------------------------------------
     | Session Lifetime
@@ -129,7 +137,7 @@ return [
 
     'cookie' => env(
         'SESSION_COOKIE',
-        Str::slug(env('APP_NAME', 'laravel')).'-session'
+        Str::slug(env('APP_NAME', 'laravel')) . '-session'
     ),
 
     /*
