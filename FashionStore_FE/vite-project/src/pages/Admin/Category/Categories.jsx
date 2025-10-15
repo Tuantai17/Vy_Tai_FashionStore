@@ -303,7 +303,7 @@ export default function Categories() {
             </button>
             <button
               onClick={() => navigate("/admin/categories/add")}
-              style={{ ...btnBase(false), border: "none", color: "#000",}}
+              style={{ ...btnBase(false), border: "none", color: "#000"}}
             >
               Add
             </button>
