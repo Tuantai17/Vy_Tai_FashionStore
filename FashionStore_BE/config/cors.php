@@ -13,9 +13,9 @@ return [
     'allowed_origins' => array_filter([
         'http://localhost:5173',
         'http://127.0.0.1:5173',
-        'https://vy-tai-fashion-store-ud16.vercel.app',
-        env('FRONTEND_URL', null), // ví dụ: https://vy-tai-fashion-store-ud16.vercel.app
+        env('FRONTEND_URL', null),   // https://vy-tai-fashion-store-ud16.vercel.app
     ]),
+
 
     'allowed_origins_patterns' => [],
 

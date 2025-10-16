@@ -89,150 +89,154 @@ export default function Register() {
     []
   );
 
-  const styles = useMemo(
-    () => ({
-      page: {
-        position: "relative",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "100vh",
-        padding: "48px 16px",
-        background: "linear-gradient(135deg,#eef2ff 0%, #e7ecff 60%, #eaf1ff 100%)",
-        overflow: "hidden",
-      },
-      glow: {
-        position: "absolute",
-        width: 520,
-        height: 520,
-        borderRadius: "50%",
-        background: "radial-gradient(circle at 30% 30%, rgba(85,101,255,0.45), transparent 65%)",
-        opacity: mounted ? 1 : 0,
-        transform: mounted ? "translateY(0)" : "translateY(60px)",
-        transition: "opacity 1s ease, transform 1s ease",
-      },
-      glowSecondary: {
-        position: "absolute",
-        width: 420,
-        height: 420,
-        borderRadius: "50%",
-        background: "radial-gradient(circle at 70% 70%, rgba(126,160,255,0.42), transparent 65%)",
-        opacity: mounted ? 0.85 : 0,
-        transform: mounted ? "translateY(0)" : "translateY(-80px)",
-        transition: "opacity 1.2s ease, transform 1.2s ease",
-      },
-      shell: {
-        position: "relative",
-        width: "min(960px, 96vw)",
-        minHeight: 540,
-        background: palette.surface,
-        borderRadius: 28,
-        boxShadow: "0 18px 40px rgba(31,42,68,0.08), 0 50px 100px rgba(31,42,68,0.08)",
-        display: "flex",
-        overflow: "hidden",
-      },
-      // 👇 GỌN FORM: thu hẹp vùng form + để overlay có chỗ đè lên
-      formBox: {
-        width: "50%",                  // trước 58%
-        padding: "56px 48px",          // gọn lại chút
-        display: "flex",
-        flexDirection: "column",
-        gap: 18,
-        justifyContent: "center",
-        zIndex: 2,                     // dưới overlay
-        transform: mounted ? "translateX(0)" : "translateX(-36px)",
-        opacity: mounted ? 1 : 0,
-        transition: "transform .6s cubic-bezier(.23,1,.32,1), opacity .6s ease",
-      },
-      heading: { fontSize: 30, margin: 0, color: palette.text, letterSpacing: 0.2 },
-      subHeading: { color: palette.subtle, marginTop: 10, lineHeight: 1.65, maxWidth: 360 },
+const FORM_MAX = 360; // 👈 bề rộng tối đa của form/ô nhập
 
-      serverError: {
-        background: "#ffe9e9",
-        border: "1px solid #ffb4b4",
-        color: "#c23b3b",
-        borderRadius: 12,
-        padding: "12px 14px",
-        fontSize: 14,
-      },
-      fieldColumn: { display: "flex", flexDirection: "column" },
-      label: { fontWeight: 600, color: palette.text, marginBottom: 6, letterSpacing: 0.15 },
+const styles = useMemo(() => ({
+  page: {
+    position: "relative",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "100vh",
+    padding: "48px 16px",
+    background: "linear-gradient(135deg,#eef2ff 0%, #e7ecff 60%, #eaf1ff 100%)",
+    overflow: "hidden",
+  },
+  glow: {
+    position: "absolute",
+    width: 520, height: 520, borderRadius: "50%",
+    background: "radial-gradient(circle at 30% 30%, rgba(85,101,255,0.45), transparent 65%)",
+    opacity: mounted ? 1 : 0,
+    transform: mounted ? "translateY(0)" : "translateY(60px)",
+    transition: "opacity 1s ease, transform 1s ease",
+    zIndex: 0,
+  },
+  glowSecondary: {
+    position: "absolute",
+    width: 420, height: 420, borderRadius: "50%",
+    background: "radial-gradient(circle at 70% 70%, rgba(126,160,255,0.42), transparent 65%)",
+    opacity: mounted ? 0.85 : 0,
+    transform: mounted ? "translateY(0)" : "translateY(-80px)",
+    transition: "opacity 1.2s ease, transform 1.2s ease",
+    zIndex: 0,
+  },
+  shell: {
+    position: "relative",
+    width: "min(960px, 96vw)",
+    minHeight: 540,
+    background: palette.surface,
+    borderRadius: 28,
+    boxShadow: "0 18px 40px rgba(31,42,68,0.08), 0 50px 100px rgba(31,42,68,0.08)",
+    display: "flex",
+    overflow: "hidden",
+  },
 
-      // 👇 Ô nhập gọn hơn
-      input: {
-        width: "100%",
-        padding: "12px 14px",          // trước 14px 16px
-        borderRadius: 12,
-        border: "1px solid #e3e7ff",
-        background: "#f8faff",
-        color: palette.text,
-        outline: "none",
-        transition: "border-color .25s ease, box-shadow .25s ease, background .25s ease",
-      },
-      inputFocus: {
-        borderColor: palette.primary,
-        background: "#ffffff",
-        boxShadow: "0 10px 26px rgba(85,101,255,0.16)",
-      },
 
-      // Hàng mật khẩu + nhập lại: vẫn giữ cấu trúc nhưng sẽ gọn
-      dualRow: {
-        display: "flex",
-        gap: 14,
-        flexWrap: "wrap",
-      },
 
-      submit: {
-        padding: "13px 16px",
-        borderRadius: 14,
-        border: "none",
-        cursor: "pointer",
-        background: `linear-gradient(90deg, ${palette.primary}, ${palette.accent})`,
-        color: "#fff",
-        fontWeight: 700,
-        letterSpacing: 0.4,
-        boxShadow: "0 16px 34px rgba(85,101,255,0.32)",
-        transition: "transform .22s ease, box-shadow .22s ease, opacity .2s ease",
-      },
 
-      // 👇 OVERLAY ĐÈ LÊN: rộng hơn + nằm trên cùng
-      overlay: {
-        position: "absolute",
-        top: 0,
-        right: "-10px",                // hơi tràn qua để cảm giác đè
-        width: "47%",                  // trước 45%
-        height: "100%",
-        zIndex: 5,                     // trên form
-        background: `linear-gradient(135deg, ${palette.primary}, ${palette.primaryDark})`,
-        borderRadius: "280px 0 0 280px",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        textAlign: "center",
-        padding: "0 48px",
-        color: "#fff",
-        transform: mounted ? "translateX(0)" : "translateX(50%)",
-        transition: "transform .65s cubic-bezier(.19,1,.22,1)",
-        boxShadow: "0 20px 60px rgba(83, 98, 230, 0.25)", // đổ bóng đẹp hơn
-      },
-      overlayHeading: { fontSize: 32, fontWeight: 800, marginBottom: 12, letterSpacing: 0.4 },
-      overlayText: { lineHeight: 1.6, opacity: 0.92, maxWidth: 300 },
-      overlayBtn: {
-        marginTop: 24,
-        padding: "12px 28px",
-        borderRadius: 999,
-        border: "1px solid rgba(255,255,255,0.9)",
-        background: "transparent",
-        color: "#fff",
-        fontWeight: 700,
-        cursor: "pointer",
-        letterSpacing: 0.35,
-        transition: "background .25s ease, color .25s ease, transform .25s ease",
-      },
-    }),
-    [mounted, palette]
-  );
+  
+
+  /* Form gọn lại và luôn nằm trên overlay */
+  formBox: {
+    width: "52%",
+    padding: "56px 40px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 18,
+    justifyContent: "center",
+    position: "relative",
+    zIndex: 10,
+    transform: mounted ? "translateX(0)" : "translateX(-24px)",
+    opacity: mounted ? 1 : 0,
+    transition: "transform .6s cubic-bezier(.23,1,.32,1), opacity .6s ease",
+  },
+  heading: { fontSize: 30, margin: 0, color: palette.text, letterSpacing: 0.2 },
+  subHeading: { color: palette.subtle, marginTop: 10, lineHeight: 1.65, maxWidth: 420 },
+
+  serverError: {
+    background: "#ffe9e9",
+    border: "1px solid #ffb4b4",
+    color: "#c23b3b",
+    borderRadius: 12,
+    padding: "12px 14px",
+    fontSize: 14,
+    maxWidth: FORM_MAX,
+  },
+  fieldColumn: { display: "flex", flexDirection: "column", maxWidth: FORM_MAX },
+  label: { fontWeight: 600, color: palette.text, marginBottom: 6, letterSpacing: 0.15 },
+
+  /* Ô nhập & nút ngắn lại theo FORM_MAX */
+  input: {
+    width: "100%",
+    padding: "11px 14px",
+    borderRadius: 12,
+    border: "1px solid #e3e7ff",
+    background: "#f8faff",
+    color: palette.text,
+    outline: "none",
+    transition: "border-color .25s ease, box-shadow .25s ease, background .25s ease",
+    position: "relative",
+    zIndex: 11,
+  },
+  inputFocus: {
+    borderColor: palette.primary,
+    background: "#ffffff",
+    boxShadow: "0 10px 24px rgba(85,101,255,0.14)",
+  },
+
+  dualRow: {
+    display: "flex",
+    gap: 12,
+    flexWrap: "wrap",
+    maxWidth: FORM_MAX,
+  },
+
+  submit: {
+    width: "100%",                // full trong khung 360px
+    maxWidth: FORM_MAX,
+    padding: "12px 16px",
+    borderRadius: 14,
+    border: "none",
+    cursor: "pointer",
+    background: `linear-gradient(90deg, ${palette.primary}, ${palette.accent})`,
+    color: "#fff",
+    fontWeight: 700,
+    letterSpacing: 0.4,
+    boxShadow: "0 16px 34px rgba(85,101,255,0.28)",
+    transition: "transform .22s ease, box-shadow .22s ease, opacity .2s ease",
+    position: "relative",
+    zIndex: 11,
+  },
+
+  /* Overlay thu gọn lại để không “tràn” nhiều */
+  overlay: {
+    position: "absolute",
+    top: 0,
+    right: "-14px",
+    width: "44%",                 // hẹp hơn tí
+    height: "100%",
+    zIndex: 1,
+    background: `linear-gradient(135deg, ${palette.primary}, ${palette.primaryDark})`,
+    borderRadius: "260px 0 0 260px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    textAlign: "center",
+    padding: "0 44px",
+    color: "#fff",
+    transform: mounted ? "translateX(0)" : "translateX(50%)",
+    transition: "transform .65s cubic-bezier(.19,1,.22,1)",
+    boxShadow: "0 20px 60px rgba(83, 98, 230, 0.22)",
+  },
+  overlayHeading: { fontSize: 30, fontWeight: 800, marginBottom: 10, letterSpacing: 0.4 },
+  overlayText: { lineHeight: 1.55, opacity: 0.95, maxWidth: 280 },
+
+  /* Responsive: màn nhỏ thì form full width, overlay xuống dưới */
+  "@media (max-width: 820px)": {},
+}), [mounted, palette]);
+
+
 
   const focusStyle = styles.inputFocus;
 
@@ -260,7 +264,7 @@ export default function Register() {
               display: "flex",
               flexDirection: "column",
               gap: 18,
-              maxWidth: 420,          // quan trọng: giới hạn bề ngang
+              maxWidth: 200,          // quan trọng: giới hạn bề ngang
               width: "100%",
             }}
           >
