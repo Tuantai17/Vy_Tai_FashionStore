@@ -160,9 +160,7 @@ Route::get('/orders/track',  [OrderController::class, 'track']);
 Route::get('/orders/{order}', [OrderController::class, 'show'])->whereNumber('order');
 
 Route::post('/orders/{order}/cancel', [OrderController::class, 'cancelById']);
-Route::post('/orders/cancel',        [OrderController::class, 'cancel']);
-
-
+Route::post('/orders/cancel', [OrderController::class, 'cancel']);
 // Cập nhật tiến trình (ghi status_step/step_code) — KHÔNG trùng lặp
 Route::match(['put', 'patch'], '/orders/{order}',        [OrderController::class, 'updateStatusStep'])->whereNumber('order');
 Route::match(['post', 'put'],  '/orders/{order}/status', [OrderController::class, 'updateStatusStep'])->whereNumber('order');

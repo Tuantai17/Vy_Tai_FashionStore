@@ -250,7 +250,7 @@ class OrderController extends Controller
 
         if ($statusKey === 'ready')     $order->ready_at    = now();
         if ($statusKey === 'shipping')  $order->shipped_at  = now();
-        if ($statusKey === 'delivered') $order->delivered_at= now();
+        if ($statusKey === 'delivered') $order->delivered_at = now();
 
         $order->save();
 
@@ -282,6 +282,36 @@ class OrderController extends Controller
         $order = $q->firstOrFail();
         return $this->performCancel($order);
     }
+
+
+
+
+
+    public function mine(Request $request)
+    {
+        $uid = \Illuminate\Support\Facades\Auth::id();
+        if (!$uid) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $perPage = max(1, min(100, (int) $request->get('per_page', 20)));
+        $orders = \App\Models\Order::query()
+            ->where('user_id', $uid)
+            ->withCount('details')
+            ->withSum('details as total', 'amount')
+            ->latest('id')
+            ->paginate($perPage);
+
+        return response()->json($orders);
+    }
+
+
+
+
+
+
+
+
 
     private function performCancel(Order $order)
     {

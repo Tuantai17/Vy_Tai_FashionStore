@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 import { wishlistToggle } from "../lib/wishlist";
@@ -17,6 +17,59 @@ export default function ProductCard({ p }) {
     (p.category && typeof p.category === "object" ? p.category.name : null) ||
     (typeof p.category === "string" ? p.category : null);
 
+  const buildWishlistItem = (payload = {}) => {
+    const source = { ...payload };
+    const priceValue =
+      source.price ??
+      source.price_sale ??
+      p.price ??
+      p.price_sale ??
+      p.price_root ??
+      0;
+
+    return {
+      wishlist_id: source.wishlist_id ?? null,
+      id: source.id ?? p.id,
+      name: source.name ?? p.name,
+      price: Number(priceValue) || 0,
+      image:
+        source.image ??
+        source.thumbnail_url ??
+        source.thumbnail ??
+        p.image ??
+        p.thumbnail_url ??
+        p.thumbnail ??
+        PLACEHOLDER,
+      category_name:
+        source.category_name ??
+        (source.category && source.category.name) ??
+        categoryName ??
+        null,
+      brand_name:
+        source.brand_name ??
+        (source.brand && source.brand.name) ??
+        p.brand_name ??
+        null,
+      is_liked: true,
+    };
+  };
+
+  useEffect(() => {
+    setLiked(Boolean(p.is_liked));
+  }, [p.id, p.is_liked]);
+
+  useEffect(() => {
+    const handleWishlistEvent = (event) => {
+      const detail = event?.detail || {};
+      if (!detail.productId || String(detail.productId) !== String(p.id)) return;
+      if (typeof detail.liked === "boolean") {
+        setLiked(detail.liked);
+      }
+    };
+    window.addEventListener("wishlist:updated", handleWishlistEvent);
+    return () => window.removeEventListener("wishlist:updated", handleWishlistEvent);
+  }, [p.id]);
+
   const ensureAuth = () => {
     if (token) return true;
     navigate("/login");
@@ -25,17 +78,27 @@ export default function ProductCard({ p }) {
 
   const syncWishlist = async () => {
     const res = await wishlistToggle(p.id);
+    const serverFlag =
+      typeof res?.liked === "boolean" ? res.liked : undefined;
     const message = typeof res?.message === "string" ? res.message.toLowerCase() : "";
-    const isAdded = message.includes("added")
+    const inferredFlag = message.includes("added")
       ? true
       : message.includes("removed")
         ? false
         : !liked;
-    setLiked(isAdded);
-    window.dispatchEvent(
-      new CustomEvent("wishlist:updated", { detail: { productId: p.id, liked: isAdded } }),
-    );
-    if (isAdded) {
+    const nextLiked = serverFlag ?? inferredFlag;
+
+    setLiked(nextLiked);
+
+    const detail = { productId: p.id, liked: nextLiked };
+    if (nextLiked) {
+      const itemPayload = res?.item ? buildWishlistItem(res.item) : buildWishlistItem();
+      detail.item = itemPayload;
+    }
+
+    window.dispatchEvent(new CustomEvent("wishlist:updated", { detail }));
+
+    if (nextLiked) {
       const el =
         document.getElementById("wishlist-target") ||
         document.querySelector('a[href="/wishlist"]');
@@ -44,7 +107,8 @@ export default function ProductCard({ p }) {
         setTimeout(() => el.classList.remove("wishlist-pulse"), 600);
       }
     }
-    return isAdded;
+
+    return detail;
   };
 
   const handleToggleWishlist = async (event) => {
@@ -64,8 +128,8 @@ export default function ProductCard({ p }) {
       return;
     }
     try {
-      const isAdded = await syncWishlist();
-      if (isAdded) {
+      const result = await syncWishlist();
+      if (result?.liked) {
         navigate("/wishlist");
       }
     } catch (err) {

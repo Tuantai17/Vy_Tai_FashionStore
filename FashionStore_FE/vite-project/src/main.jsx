@@ -17,9 +17,17 @@ import Login from "./pages/Customers/Login";
 import Checkout from "./pages/Customers/Checkout";
 import Contact from "./pages/Customers/Contact";
 import MyOrders from "./pages/Customers/MyOrders";
+import Profile from "./pages/Customers/Profile";
 import OrderTracking from "./pages/Customers/OrderTracking";
 import ReviewSection from "./pages/Customers/ReviewSection";
 import Wishlist from "./pages/Customers/Wishlist";
+
+
+
+
+import CanceledOrders from "./pages/Customers/CanceledOrders.jsx";
+
+
 
 // ===== Admin pages/layout =====
 import AdminLayout from "./layouts/AdminLayout";
@@ -101,6 +109,15 @@ function UserMenu({ user, onLogout }) {
   const gotoMyOrders = () => {
     setOpen(false);
     navigate("/me/orders");
+  };
+
+  const gotoProfile = () => {
+    setOpen(false);
+    if (user) {
+      navigate("/profile", { state: { user } });
+    } else {
+      navigate("/profile");
+    }
   };
 
   const avatarUrl = user?.avatar || user?.photoURL;
@@ -188,6 +205,25 @@ function UserMenu({ user, onLogout }) {
           <div style={{ borderTop: "1px solid #f1f5f9" }} />
 
           <div style={{ padding: 8 }}>
+            <div
+              role="button"
+              onClick={gotoProfile}
+              className="um-item"
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "10px 12px", borderRadius: 10, cursor: "pointer", color: "#111827"
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M5 20v-1a7 7 0 0 1 14 0v1" stroke="currentColor" strokeWidth="1.5"/>
+              </svg>
+              <div style={{ lineHeight: 1.1 }}>
+                <div style={{ fontWeight: 600 }}>Thong tin tai khoan</div>
+                <div style={{ fontSize: 12, color: "#6b7280" }}>Xem va cap nhat thong tin</div>
+              </div>
+            </div>
+
             <div
               role="button"
               onClick={gotoMyOrders}
@@ -504,7 +540,12 @@ function App() {
         <Route path="/contact" element={<Layout><Contact /></Layout>} />
         <Route path="/track" element={<OrderTracking />} />
         <Route path="/me/orders" element={<Layout><MyOrders /></Layout>} />
+        <Route path="/profile" element={<Layout><Profile /></Layout>} />
         <Route path="/wishlist" element={<Layout><Wishlist /></Layout>} />
+
+
+
+          <Route path="/canceled-orders" element={<Layout><CanceledOrders /></Layout>} />
 
 
         {/* Admin */}
@@ -549,6 +590,7 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
 
 
 

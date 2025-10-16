@@ -8,59 +8,192 @@ const PLACEHOLDER = "https://placehold.co/300x200?text=No+Image";
 export default function Wishlist() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
+  const normalizeWishlistItem = (raw) => {
+    if (!raw) return null;
+    const id = raw.id ?? raw.product_id ?? raw.product?.id ?? null;
+    if (!id) return null;
+
+    const priceValue =
+      raw.price ??
+      raw.price_sale ??
+      raw.product?.price ??
+      raw.product?.price_sale ??
+      raw.product?.price_root ??
+      0;
+
+    return {
+      wishlist_id: raw.wishlist_id ?? null,
+      id,
+      name: raw.name ?? raw.product?.name ?? "",
+      price: Number(priceValue) || 0,
+      image:
+        raw.image ??
+        raw.thumbnail_url ??
+        raw.thumbnail ??
+        raw.product?.image ??
+        raw.product?.thumbnail_url ??
+        raw.product?.thumbnail ??
+        PLACEHOLDER,
+      category_name:
+        raw.category_name ??
+        raw.category?.name ??
+        raw.product?.category_name ??
+        raw.product?.category?.name ??
+        "",
+      brand_name:
+        raw.brand_name ??
+        raw.brand?.name ??
+        raw.product?.brand_name ??
+        raw.product?.brand?.name ??
+        "",
+      is_liked: true,
+    };
+  };
+
+  const removeItemLocally = (pid) => {
+    const target = String(pid);
+    setItems((prev) => prev.filter((x) => String(x.id) !== target));
+  };
+
   useEffect(() => {
-    if (!token) { navigate("/login"); return; }
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    let isMounted = true;
+
     (async () => {
       try {
-        const data = await wishlistList();
+        setError("");
+        const data = await wishlistList({ timeout: 60000 });
+        if (!isMounted) return;
         setItems(Array.isArray(data) ? data : []);
       } catch (e) {
         console.error("wishlistList error:", e);
-      } finally { setLoading(false); }
+        const message =
+          e?.name === "AbortError"
+            ? "Khong the ket noi den wishlist. Vui long thu lai."
+            : "Khong the tai danh sach yeu thich. Vui long thu lai.";
+        if (isMounted) setError(message);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
     })();
+
+    return () => {
+      isMounted = false;
+    };
   }, [token, navigate]);
 
   useEffect(() => {
     const onWishlistUpdated = async (event) => {
       if (!token) return;
       const detail = event?.detail || {};
-      if (detail.liked === undefined) return;
+      const { productId, liked, item } = detail;
+      if (!productId || typeof liked !== "boolean") return;
+
+      if (liked && item) {
+        const normalized = normalizeWishlistItem(item);
+        if (!normalized) return;
+        setItems((prev) => {
+          const idx = prev.findIndex((x) => String(x.id) === String(normalized.id));
+          if (idx !== -1) {
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...normalized };
+            return next;
+          }
+          return [normalized, ...prev];
+        });
+        setError("");
+        return;
+      }
+
+      if (!liked) {
+        removeItemLocally(productId);
+        setError("");
+        return;
+      }
+
       try {
-        const data = await wishlistList();
+        const data = await wishlistList({ timeout: 60000 });
         setItems(Array.isArray(data) ? data : []);
+        setError("");
       } catch (e) {
         console.error("wishlist refresh error:", e);
+        const message =
+          e?.name === "AbortError"
+            ? "Khong the ket noi den wishlist. Vui long thu lai."
+            : "Khong the tai danh sach yeu thich. Vui long thu lai.";
+        setError(message);
       }
     };
+
     window.addEventListener("wishlist:updated", onWishlistUpdated);
     return () => window.removeEventListener("wishlist:updated", onWishlistUpdated);
   }, [token]);
 
   const handleRemove = async (pid) => {
     try {
-      await wishlistRemove(pid);
-      setItems((prev) => prev.filter((x) => x.id !== pid));
-    } catch (e) { console.error("wishlistRemove error:", e); }
+      const res = await wishlistRemove(pid);
+      const targetId = res?.product_id ?? pid;
+      removeItemLocally(targetId);
+      window.dispatchEvent(
+        new CustomEvent("wishlist:updated", {
+          detail: { productId: targetId, liked: false },
+        })
+      );
+    } catch (e) {
+      console.error("wishlistRemove error:", e);
+    }
   };
 
   const handleToggle = async (pid) => {
     try {
-      await wishlistToggle(pid);
-      setItems((prev) => prev.filter((x) => x.id !== pid));
-    } catch (e) { console.error("wishlistToggle error:", e); }
+      const res = await wishlistToggle(pid);
+      if (res?.liked) {
+        const normalized = normalizeWishlistItem(res.item);
+        if (normalized) {
+          setItems((prev) => {
+            const idx = prev.findIndex((x) => String(x.id) === String(normalized.id));
+            if (idx !== -1) {
+              const next = [...prev];
+              next[idx] = { ...next[idx], ...normalized };
+              return next;
+            }
+            return [normalized, ...prev];
+          });
+          setError("");
+          return;
+        }
+      }
+
+      const targetId = res?.product_id ?? pid;
+      removeItemLocally(targetId);
+      window.dispatchEvent(
+        new CustomEvent("wishlist:updated", {
+          detail: { productId: targetId, liked: false },
+        })
+      );
+    } catch (e) {
+      console.error("wishlistToggle error:", e);
+    }
   };
 
-  if (loading) return <div style={{padding:16}}>Đang tải danh sách yêu thích…</div>;
+  if (loading) {
+    return <div style={{ padding: 16 }}>Dang tai danh sach yeu thich...</div>;
+  }
 
   if (!items.length) {
     return (
-      <div style={{padding:16}}>
-        <h2>Yêu thích</h2>
-        <p>Bạn chưa có sản phẩm nào trong danh sách.</p>
-        <Link to="/products">Tiếp tục mua sắm</Link>
+      <div style={{ padding: 16 }}>
+        <h2>Yeu thich</h2>
+        <p>{error || "Ban chua co san pham nao trong danh sach."}</p>
+        <Link to="/products">Tiep tuc mua sam</Link>
       </div>
     );
   }
@@ -84,11 +217,20 @@ export default function Wishlist() {
   `;
 
   return (
-    <div style={{padding:16}}>
+    <div style={{ padding: 16 }}>
       <style>{styles}</style>
-      <h2 style={{marginBottom:12}}>Yêu thích ({items.length})</h2>
+      <h2 style={{ marginBottom: 12 }}>Yeu thich ({items.length})</h2>
+      {error && (
+        <div style={{ marginBottom: 12, color: "#c0392b", fontSize: 14 }}>{error}</div>
+      )}
 
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px,1fr))", gap:16 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))",
+          gap: 16,
+        }}
+      >
         {items.map((p) => (
           <div key={p.id} className="product-card">
             <Link to={`/products/${p.id}`} className="product-card__link">
@@ -97,9 +239,18 @@ export default function Wishlist() {
                   src={p.image || p.thumbnail_url || p.thumbnail || PLACEHOLDER}
                   alt={p.name}
                   className="product-image__img"
-                  onError={(e)=>{e.currentTarget.src = PLACEHOLDER;}}
+                  onError={(event) => {
+                    event.currentTarget.src = PLACEHOLDER;
+                  }}
                 />
-                <div className="wishlist-btn" onClick={(e)=>{ e.preventDefault(); handleToggle(p.id); }} title="Bỏ yêu thích">
+                <div
+                  className="wishlist-btn"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    handleToggle(p.id);
+                  }}
+                  title="Bo yeu thich"
+                >
                   <FaHeart className="wishlist-icon" />
                 </div>
               </div>
@@ -108,22 +259,37 @@ export default function Wishlist() {
                 <div className="name">{p.name}</div>
                 {p.category_name && <span className="category-chip">{p.category_name}</span>}
                 <div className="brand">{p.brand_name || "Farm Local"}</div>
-                <div className="price">₫{Number(p.price||0).toLocaleString("vi-VN")}</div>
+                <div className="price">VND {Number(p.price || 0).toLocaleString("vi-VN")}</div>
               </div>
             </Link>
 
-            <div style={{display:"flex", gap:8, padding:"0 12px 12px"}}>
+            <div style={{ display: "flex", gap: 8, padding: "0 12px 12px" }}>
               <button
-                onClick={()=>handleRemove(p.id)}
-                style={{ border:"1px solid #eee", padding:"6px 10px", borderRadius:8, background:"#fff", cursor:"pointer" }}
-                title="Xoá khỏi yêu thích"
+                onClick={() => handleRemove(p.id)}
+                style={{
+                  border: "1px solid #eee",
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  background: "#fff",
+                  cursor: "pointer",
+                }}
+                title="Xoa khoi danh sach"
               >
-                <FaTrash style={{verticalAlign:"middle"}}/> Xoá
+                <FaTrash style={{ verticalAlign: "middle" }} /> Xoa
               </button>
               <Link
                 to={`/products/${p.id}`}
-                style={{ border:"1px solid #2e7d32", padding:"6px 10px", borderRadius:8, background:"#2e7d32", color:"#fff", textDecoration:"none" }}
-              >Xem sản phẩm</Link>
+                style={{
+                  border: "1px solid #2e7d32",
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  background: "#2e7d32",
+                  color: "#fff",
+                  textDecoration: "none",
+                }}
+              >
+                Xem san pham
+              </Link>
             </div>
           </div>
         ))}
