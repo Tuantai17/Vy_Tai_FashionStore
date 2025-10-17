@@ -107,6 +107,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('wishlist/count', [WishlistController::class, 'count']); // tuỳ chọn
     Route::post('wishlist/toggle', [WishlistController::class, 'toggle']);
     Route::delete('wishlist/{product}', [WishlistController::class, 'destroy']);
+
+    // Orders owned by authenticated customer
+    Route::get('orders/mine', [OrderController::class, 'mine']);
 });
 
 
@@ -167,12 +170,7 @@ Route::match(['post', 'put'],  '/orders/{order}/status', [OrderController::class
 Route::post('/orders/update-status', [OrderController::class, 'updateStatusStepById']);
 
 // ===== My Orders (cần Bearer) — TRẢ LUÔN total để FE hiển thị =====
-Route::middleware('auth:sanctum')->get('/my-orders', function (Request $req) {
-    return Order::withSum('details as total', 'amount')   // <- tính tổng
-        ->where('email', $req->user()->email)
-        ->latest('id')
-        ->get();
-});
+Route::middleware('auth:sanctum')->get('/my-orders', [OrderController::class, 'mine']);
 
 // Checkout
 Route::post('/checkout', [OrderController::class, 'checkout'])->middleware('auth:sanctum');

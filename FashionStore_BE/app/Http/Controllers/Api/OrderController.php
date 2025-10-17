@@ -245,8 +245,13 @@ class OrderController extends Controller
             'delivered' => 4,
         ];
 
-        $order->status_step = $statusKey;
-        $order->step_code   = $map[$statusKey] ?? 0;
+        $table = $order->getTable();
+        if (Schema::hasColumn($table, 'status_step')) {
+            $order->status_step = $statusKey;
+        }
+        if (Schema::hasColumn($table, 'step_code')) {
+            $order->step_code = $map[$statusKey] ?? 0;
+        }
 
         if ($statusKey === 'ready')     $order->ready_at    = now();
         if ($statusKey === 'shipping')  $order->shipped_at  = now();
@@ -319,11 +324,19 @@ class OrderController extends Controller
             return response()->json($order);
         }
 
-        $order->status      = 2;
-        $order->status_step = 'canceled';
-        $order->step_code   = null;
+        $order->status = 2;
 
-        if (Schema::hasColumn('nqtv_order', 'canceled_at')) {
+        if (Schema::hasColumn($order->getTable(), 'status_step')) {
+            $order->status_step = 'canceled';
+        }
+
+        if (Schema::hasColumn($order->getTable(), 'step_code')) {
+            $order->step_code = null;
+        }
+
+        $table = $order->getTable();
+
+        if (Schema::hasColumn($table, 'canceled_at')) {
             $order->canceled_at = now();
         }
 
