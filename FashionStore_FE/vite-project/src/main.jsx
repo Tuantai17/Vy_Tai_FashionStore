@@ -37,6 +37,7 @@ import AdminInventories from "./pages/Admin/Inventories/Inventories";
 
 import AdminCategories from "./pages/Admin/Category/Categories";
 import AdminOrders from "./pages/Admin/Order/Orders";
+import AdminCoupons from "./pages/Admin/Coupon/Coupons";
 import AdminUsers from "./pages/Admin/User/Users";
 import AddProduct from "./pages/Admin/Product/AddProduct";
 import EditProduct from "./pages/Admin/Product/EditProduct";
@@ -51,6 +52,7 @@ import ShowCategory from "./pages/Admin/Category/ShowCategory.jsx";
 
 
 import Settings from "./pages/Admin/Settings/Settings.jsx";
+
 
 
 
@@ -570,13 +572,12 @@ function App() {
 
           <Route path="inventories" element={<AdminInventories />} />
 
-
-         
           <Route path="categories" element={<AdminCategories />} />
           <Route path="categories/:id" element={<ShowCategory />} />
           <Route path="categories/add" element={<AddCategory />} />
 
           <Route path="orders" element={<AdminOrders />} />
+          <Route path="coupons" element={<AdminCoupons />} />
           <Route path="users" element={<AdminUsers />} />
 
 

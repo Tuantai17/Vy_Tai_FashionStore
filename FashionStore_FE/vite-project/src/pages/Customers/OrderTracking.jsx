@@ -102,20 +102,47 @@ export default function OrderTracking() {
 
   // tổng tiền
   const money = useMemo(() => {
-    if (!order) return { subtotal: 0, shippingFee: 0, discount: 0, total: 0 };
+    if (!order) {
+      return { subtotal: 0, shippingFee: 0, discount: 0, total: 0, couponCode: null };
+    }
+
     const items = (order.items || order.order_items || []).map((it) => ({
       qty: it.qty ?? it.quantity ?? 0,
       price: Number(it.price ?? 0),
+      subtotal: Number(it.subtotal ?? (Number(it.price ?? 0) * (it.qty ?? it.quantity ?? 0))),
     }));
-    const subtotalApi = order.subtotal != null ? Number(order.subtotal) : null;
-    const subtotalCalc = items.reduce((s, it) => s + it.qty * it.price, 0);
-    const subtotal = subtotalApi ?? subtotalCalc;
 
-    const shippingFee = order.shipping_fee != null ? Number(order.shipping_fee) : 0;
-    const discount = order.discount != null ? Number(order.discount) : 0;
-    const totalApi = order.total != null ? Number(order.total) : null;
-    const total = totalApi ?? (subtotal + shippingFee - discount);
-    return { subtotal, shippingFee, discount, total };
+    const subtotalApi =
+      order.subtotal ??
+      order.items_subtotal ??
+      order.itemsSubtotal ??
+      null;
+
+    const subtotalCalc = items.reduce((sum, it) => sum + it.subtotal, 0);
+    const subtotal = subtotalApi != null ? Number(subtotalApi) : subtotalCalc;
+
+    const shippingFee = Number(
+      order.shipping_fee ??
+      order.shipping ??
+      order.shippingFee ??
+      order.delivery_fee ??
+      0
+    );
+
+    let discount = order.discount ?? order.discount_amount ?? order.discountAmount ?? order.coupon_discount ?? null;
+    discount = discount != null ? Number(discount) : null;
+
+    const totalRaw = order.total ?? order.final_total ?? order.finalTotal ?? null;
+    let total = totalRaw != null ? Number(totalRaw) : subtotal + shippingFee - (discount ?? 0);
+
+    if (discount == null) {
+      discount = Math.max(0, subtotal + shippingFee - total);
+    }
+    total = Math.max(0, total);
+
+    const couponCode = order.coupon_code ?? order.couponCode ?? order.coupon ?? null;
+
+    return { subtotal, shippingFee, discount, total, couponCode };
   }, [order]);
 
   // thời gian từng mốc (tùy API có/không)
@@ -525,6 +552,9 @@ const reorder = () => {
                 <div><span>Tổng tiền hàng:</span> ₫{fmt(money.subtotal)}</div>
                 <div><span>Phí vận chuyển:</span> ₫{fmt(money.shippingFee)}</div>
                 <div><span>Giảm giá:</span> -₫{fmt(money.discount)}</div>
+                {money.couponCode && (
+                  <div><span>Mã áp dụng:</span> {money.couponCode}</div>
+                )}
                 <div className="total"><span>Phải trả:</span> ₫{fmt(money.total)}</div>
                 <div><span>Phương thức:</span> {order?.payment_method || "—"}</div>
               </div>

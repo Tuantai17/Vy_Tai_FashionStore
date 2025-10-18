@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ProductCard from "../../components/ProductCard";
+import CouponShowcase from "../../components/CouponShowcase";
 
 const API_BASE = "http://127.0.0.1:8000";
 const API = {
@@ -430,6 +431,8 @@ export default function Home() {
               </>
             )}
           </section>
+
+          <CouponShowcase />
 
           {/* Trạng thái */}
           {loading && <p style={{ textAlign: "center", color: "#e91e63" }}>Đang tải dữ liệu...</p>}

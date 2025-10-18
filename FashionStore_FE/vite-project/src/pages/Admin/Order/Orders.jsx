@@ -308,7 +308,9 @@ export default function Orders() {
                       <td style={{ padding: 8, fontWeight: 700 }}>{o.name}</td>
                       <td style={{ padding: 8, color: "#ccc" }}>{o.email}</td>
                       <td style={{ padding: 8 }}>{o.phone}</td>
-                      <td style={{ padding: 8, textAlign: "right" }}>₫{VND.format(Number(o.total ?? 0))}</td>
+                      <td style={{ padding: 8, textAlign: "right" }}>
+                        ₫{VND.format(Number(o.total_due ?? o.total ?? o.items_subtotal ?? 0))}
+                      </td>
 
                       <td style={{ padding: 8 }}>
                         {/* Step bar */}

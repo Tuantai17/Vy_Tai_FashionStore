@@ -9,27 +9,12 @@ class Order extends Model
 {
     use HasFactory;
 
-    protected $table = 'nqtv_order';
+    // ---- Table/PK ----
+    protected $table = 'nqtv_order';     // ❗ bạn đang dùng bảng này
     protected $primaryKey = 'id';
     public $timestamps = true;
 
-    // protected $fillable = [
-    //     'user_id',
-    //     'name',
-    //     'phone',
-    //     'email',
-    //     'address',
-    //     'note',
-    //     'status',
-    //     'updated_by',
-    //     // khuyên nên có:
-    //     'total',
-    //     'payment_method',
-    //     'created_by',
-    //     'status_step', 
-    //     'step_code',
-    // ];
-
+    // ---- Gán hàng loạt ----
     protected $fillable = [
         'user_id',
         'name',
@@ -37,68 +22,92 @@ class Order extends Model
         'email',
         'address',
         'note',
-        'status',
-        'updated_by',
-        'total',
-        'payment_method',     // + đã có thể dùng: 'cod' | 'momo'
-        'payment_status',     // + 'pending' | 'paid' | 'failed' | 'canceled'
-        'momo_trans_id',      // + transId từ MoMo
-        'momo_request_id',    // + requestId đã gửi đi
+
+        // trạng thái
+        'status',          // 0 pending, 1 confirmed, 2 canceled...
+        'status_step',     // 'pending' | 'confirmed' | 'ready' | 'shipping' | 'delivered' | 'canceled'
+        'step_code',       // 0..4 tương ứng status_step
+
+        // thanh toán
+        'payment_method',  // 'cod' | 'momo' | ...
+        'payment_status',  // 'pending' | 'paid' | 'failed' | 'canceled'
+        'momo_trans_id',
+        'momo_request_id',
+
+        // tổng tiền
+        'subtotal',        // tổng hàng
+        'shipping',        // phí ship
+        'discount_amount', // số tiền giảm
+        'total',           // tổng cuối
+
+        // mã giảm giá
+        'coupon_code',
+
+        // audit
         'created_by',
-        'status_step',
-        'step_code',
+        'updated_by',
     ];
 
+    // ---- Kiểu dữ liệu/cast (rất quan trọng để FE nhận đúng số) ----
+    protected $casts = [
+        'subtotal'        => 'float',
+        'shipping'        => 'float',
+        'discount_amount' => 'float',
+        'total'           => 'float',
+        'step_code'       => 'integer',
+        'status'          => 'integer',
+        'created_at'      => 'datetime',
+        'updated_at'      => 'datetime',
+    ];
 
-    // Quan hệ gốc bạn đang dùng
+    // ---- Quan hệ ----
     public function details()
     {
         return $this->hasMany(OrderDetail::class, 'order_id');
     }
 
-    // Alias để FE dùng 'items'
+    // alias cho FE
     public function items()
     {
         return $this->hasMany(OrderDetail::class, 'order_id');
     }
 
+    // ---- Accessors tiện dụng ----
 
-
-    public function show(Order $order)
+    // Nếu có cột 'code' thì ưu tiên; không có thì trả id
+    public function getCodeAttribute(): string
     {
-        // nạp details + product để lấy ảnh, đồng thời tính total từ amount
-        $order->load(['details.product:id,thumbnail,name'])
-            ->loadSum('details as total', 'amount');
+        return $this->attributes['code'] ?? (string) $this->id;
+    }
 
-        // map về schema FE đang dùng (OrderDetail.jsx)
-        $resp = [
-            'id'         => $order->id,
-            'name'       => $order->name,
-            'email'      => $order->email,
-            'phone'      => $order->phone,
-            'address'    => $order->address,
-            'note'       => $order->note,
-            'status'     => (int)($order->status ?? 0),
-            'total'      => (float)($order->total ?? $order->total), // total do loadSum alias
-            'created_at' => $order->created_at,
-            'updated_at' => $order->updated_at,
-            'items'      => $order->details->map(function ($d) {
-                $p = $d->product; // có thể null nếu SP bị xóa
-                $image = $p?->thumbnail_url ?? $p?->thumbnail;
+    // Tính tổng cuối nếu chưa set total (để phòng dữ liệu cũ)
+    public function getFinalTotalAttribute(): float
+    {
+        // nếu đã lưu total thì trả total
+        if (!is_null($this->attributes['total'] ?? null)) {
+            return (float) $this->attributes['total'];
+        }
+        // fallback công thức subtotal + shipping - discount
+        $sub  = (float) ($this->attributes['subtotal'] ?? 0);
+        $ship = (float) ($this->attributes['shipping'] ?? 0);
+        $disc = (float) ($this->attributes['discount_amount'] ?? 0);
+        return max(0, $sub + $ship - $disc);
+    }
 
-                return [
-                    'id'            => $d->id,
-                    'product_id'    => $d->product_id,
-                    // ưu tiên tên hiện tại của product; fallback tên snapshot nếu bạn có cột đó
-                    'product_name'  => $p?->name ?? ($d->product_name ?? 'Sản phẩm'),
-                    'product_image' => $image,                     // ← ẢNH lấy từ bảng products
-                    'price'         => (float)$d->price_buy,       // map price_buy -> price
-                    'qty'           => (int)$d->qty,
-                    'subtotal'      => (float)($d->amount ?? $d->price_buy * $d->qty), // map amount -> subtotal
-                ];
-            })->values(),
-        ];
+    // ---- Scopes tham khảo (tuỳ dùng) ----
+    public function scopeMine($q, $userId)
+    {
+        return $q->where('user_id', $userId);
+    }
 
-        return response()->json($resp);
+    public function scopeSearch($q, $keyword)
+    {
+        if (!$keyword) return $q;
+        return $q->where(function ($qq) use ($keyword) {
+            $qq->where('name', 'like', "%{$keyword}%")
+                ->orWhere('phone', 'like', "%{$keyword}%")
+                ->orWhere('email', 'like', "%{$keyword}%")
+                ->orWhere('id', $keyword);
+        });
     }
 }

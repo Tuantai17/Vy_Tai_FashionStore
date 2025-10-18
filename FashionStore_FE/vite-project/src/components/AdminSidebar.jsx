@@ -105,6 +105,9 @@ export default function AdminSidebar() {
         <NavLink to="/admin/orders" style={linkStyle}>
           Orders
         </NavLink>
+        <NavLink to="/admin/coupons" style={linkStyle}>
+          Coupons
+        </NavLink>
         <NavLink to="/admin/users" style={linkStyle}>
           Users
         </NavLink>

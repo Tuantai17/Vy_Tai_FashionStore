@@ -185,7 +185,9 @@ export default function MyOrders() {
                     <tr key={o.id || o.code}>
                       <td className="cell-strong">#{o.code || o.id}</td>
                       <td>{toDateTimeString(o.created_at || o.createdAt)}</td>
-                      <td className="cell-strong">{formatVND(o.total_price ?? o.total ?? 0)}</td>
+                      <td className="cell-strong">
+                        {formatVND(o.total_due ?? o.total ?? o.total_price ?? 0)}
+                      </td>
                       <td><span style={statusBadgeStyle(statusKey)}>{label}</span></td>
                       <td className="cell-actions">
                         <button className="btn ghost" onClick={() => toTrack(o)}>Xem chi tiết</button>
