@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { wishlistList, wishlistRemove, wishlistToggle } from "../../lib/wishlist";
 import { FaTrash, FaHeart } from "react-icons/fa";
+import { getCustomerToken } from "../../utils/authStorage";
 
 const PLACEHOLDER = "https://placehold.co/300x200?text=No+Image";
 
@@ -10,7 +11,7 @@ export default function Wishlist() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
+  const token = getCustomerToken();
 
   const normalizeWishlistItem = (raw) => {
     if (!raw) return null;
@@ -297,3 +298,6 @@ export default function Wishlist() {
     </div>
   );
 }
+
+
+

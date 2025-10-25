@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { Editor } from '@tinymce/tinymce-react';
+import { getAdminToken } from "../../../utils/authStorage";
 
 
 
@@ -136,7 +137,7 @@ export default function EditProduct() {
       fd.append("status", form.status || "1");
       if (form.thumbnail)   fd.append("thumbnail", form.thumbnail);
 
-      const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
+      const token = getAdminToken();
       const res = await fetch(`${API_BASE}/admin/products/${id}`, {
         method: "POST",
         headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },

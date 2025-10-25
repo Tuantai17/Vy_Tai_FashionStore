@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getAdminToken } from "../../../utils/authStorage";
 
 const API_BASE = "http://127.0.0.1:8000/api";
 const VND = new Intl.NumberFormat("vi-VN");
@@ -31,7 +32,7 @@ const stepIndex = (key) => Math.max(0, STEPS.findIndex((s) => s.key === key));
 
 const authHeaders = () => {
   const h = { Accept: "application/json", "Content-Type": "application/json" };
-  const token = localStorage.getItem("token");
+  const token = getAdminToken();
   if (token) h.Authorization = `Bearer ${token}`;
   return h;
 };
@@ -308,7 +309,9 @@ export default function Orders() {
                       <td style={{ padding: 8, fontWeight: 700 }}>{o.name}</td>
                       <td style={{ padding: 8, color: "#ccc" }}>{o.email}</td>
                       <td style={{ padding: 8 }}>{o.phone}</td>
-                      <td style={{ padding: 8, textAlign: "right" }}>₫{VND.format(Number(o.total ?? 0))}</td>
+                      <td style={{ padding: 8, textAlign: "right" }}>
+                        ₫{VND.format(Number(o.total_due ?? o.total ?? o.items_subtotal ?? 0))}
+                      </td>
 
                       <td style={{ padding: 8 }}>
                         {/* Step bar */}
@@ -422,3 +425,6 @@ export default function Orders() {
     </div>
   );
 }
+
+
+

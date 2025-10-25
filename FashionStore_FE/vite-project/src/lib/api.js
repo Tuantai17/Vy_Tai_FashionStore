@@ -1,8 +1,10 @@
-// src/lib/api.js
+﻿// src/lib/api.js
 
 // ✅ Base URL: ưu tiên ENV, nếu không có thì
 // - Dev (localhost) -> dùng http://127.0.0.1:8000/api
 // - Prod -> fallback Render của bạn
+import { getAdminToken, getCustomerToken } from "../utils/authStorage";
+
 const DEFAULT_DEV = "http://127.0.0.1:8000/api";
 const DEFAULT_PROD = "https://vytaifashionstore-production.up.railway.app/api";
 
@@ -17,18 +19,39 @@ export function join(path) {
   return `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-/** Token helpers */
+const resolveLegacyToken = () => localStorage.getItem("token");
+
+const resolveToken = (path, role) => {
+  if (role === "admin") {
+    return getAdminToken() || resolveLegacyToken();
+  }
+  if (role === "customer") {
+    return getCustomerToken() || resolveLegacyToken();
+  }
+
+  const isAdminPath = typeof path === "string" && path.startsWith("/admin/");
+  if (isAdminPath) {
+    return getAdminToken() || getCustomerToken() || resolveLegacyToken();
+  }
+
+  return getCustomerToken() || getAdminToken() || resolveLegacyToken();
+};
+
 export function getToken() {
-  return localStorage.getItem("token");
+  return resolveToken("/", undefined);
 }
+
 export function setToken(token) {
-  if (!token) localStorage.removeItem("token");
-  else localStorage.setItem("token", token);
+  if (!token) {
+    localStorage.removeItem("token");
+  } else {
+    localStorage.setItem("token", token);
+  }
 }
 
 /** Headers mặc định; nếu auth=true sẽ thêm Bearer token.
  *  Tự động bỏ Content-Type khi dùng FormData. */
-export function buildHeaders({ auth = false, headers = {}, isFormData = false } = {}) {
+export function buildHeaders({ auth = false, headers = {}, isFormData = false, token } = {}) {
   const base = isFormData ? {} : { "Content-Type": "application/json" };
   const out = {
     Accept: "application/json",
@@ -36,8 +59,9 @@ export function buildHeaders({ auth = false, headers = {}, isFormData = false } 
     ...headers,
   };
   if (auth) {
-    const token = getToken();
-    if (token) out.Authorization = `Bearer ${token}`;
+    if (token) {
+      out.Authorization = `Bearer ${token}`;
+    }
   }
   return out;
 }
@@ -109,15 +133,17 @@ export async function request(
     query,           // { page: 1, per_page: 12 } hoặc { id: [1,2] }
     timeout = 20000, // ms
     signal,          // AbortSignal (tuỳ chọn)
+    authRole,
     ...opts
   } = {}
 ) {
   let url = join(path) + buildQuery(query);
 
   const isFormData = body instanceof FormData;
+  const token = auth ? resolveToken(path, authRole) : null;
   const init = {
     method,
-    headers: buildHeaders({ auth, headers, isFormData }),
+    headers: buildHeaders({ auth, headers, isFormData, token }),
     body: normalizeBody(body),
     ...opts,
   };

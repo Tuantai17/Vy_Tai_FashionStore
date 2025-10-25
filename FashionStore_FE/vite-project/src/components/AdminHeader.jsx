@@ -1,8 +1,14 @@
+import {
+  getAdminToken,
+  getAdminUser,
+  clearAdminSession,
+} from "../utils/authStorage";
+
 export default function AdminHeader() {
-  const user = JSON.parse(localStorage.getItem("user") || "null");
+  const user = getAdminUser();
 
   const handleLogout = async () => {
-    const token = localStorage.getItem("token");
+    const token = getAdminToken();
 
     try {
       if (token) {
@@ -13,14 +19,13 @@ export default function AdminHeader() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-        });
+        }).catch(() => {});
       }
     } catch (err) {
-      console.error("Logout failed:", err);
+      console.error("Admin logout failed:", err);
     } finally {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.href = "/admin/login"; // ✅ quay về trang login admin
+      clearAdminSession();
+      window.location.href = "/admin/login";
     }
   };
 
@@ -50,7 +55,6 @@ export default function AdminHeader() {
           }}
         />
 
-        {/* Avatar + tên admin */}
         {user && (
           <div
             style={{
@@ -77,7 +81,6 @@ export default function AdminHeader() {
           </div>
         )}
 
-        {/* Nút logout */}
         <button
           onClick={handleLogout}
           style={{

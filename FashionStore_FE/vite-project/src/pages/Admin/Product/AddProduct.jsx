@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Editor } from "@tinymce/tinymce-react";
-
+import { getAdminToken } from "../../../utils/authStorage";
 
 const API_BASE = "http://127.0.0.1:8000/api";
 const PLACEHOLDER = "https://placehold.co/120x120?text=No+Image";
@@ -95,7 +95,7 @@ export default function AddProduct() {
       fd.append("status", "1");
       if (form.thumbnail) fd.append("thumbnail", form.thumbnail);
 
-      const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
+      const token = getAdminToken();
       const res = await fetch(`${API_BASE}/admin/products`, {
         method: "POST",
         headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },

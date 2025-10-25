@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import DOMPurify from "dompurify";
 import ProductCard from "../../components/ProductCard";
+import { getCustomerToken } from "../../utils/authStorage";
 
 const APP_BASE = "http://127.0.0.1:8000";
 const API_BASE = `${APP_BASE}/api`;
@@ -166,7 +167,7 @@ export default function ProductDetail({ addToCart }) {
 
   // Check quyền review (nếu backend có API can-review)
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = getCustomerToken();
     if (!token) {
       setCanReview(false);
       return;
@@ -250,7 +251,7 @@ export default function ProductDetail({ addToCart }) {
   };
 
   const handleAddToCart = (e) => {
-    const token = localStorage.getItem("token");
+    const token = getCustomerToken();
     if (!token) {
       alert("⚠️ Bạn cần đăng nhập trước khi thêm sản phẩm!");
       navigate("/login", { state: { from: `/products/${id}` } });
@@ -279,7 +280,7 @@ export default function ProductDetail({ addToCart }) {
   // ---- submit review
   const submitReview = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem("token");
+    const token = getCustomerToken();
     if (!token) {
       alert("Vui lòng đăng nhập để đánh giá.");
       navigate("/login", { state: { from: `/products/${id}?review=1` } });
@@ -325,7 +326,7 @@ export default function ProductDetail({ addToCart }) {
 
   // Có hiển thị form không?
   const searchWantsReview = new URLSearchParams(location.search).get("review") === "1";
-  const isLoggedIn = !!localStorage.getItem("token");
+  const isLoggedIn = !!getCustomerToken();
   const showReviewForm =
     activeTab === "reviews" &&
     isLoggedIn &&
@@ -616,13 +617,7 @@ export default function ProductDetail({ addToCart }) {
             ) : (
               <div className="related-grid">
                 {related.map((p) => (
-                  <ProductCard
-                    key={p.id}
-                    p={{
-                      ...p,
-                      image: p.image_url || p.thumbnail_url || p.thumbnail || p.image || PLACEHOLDER,
-                    }}
-                  />
+                  <ProductCard key={p.id} p={p} />
                 ))}
               </div>
             )}
@@ -632,3 +627,6 @@ export default function ProductDetail({ addToCart }) {
     </div>
   );
 }
+
+
+

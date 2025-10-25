@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
+import { getAdminToken } from "../../../utils/authStorage";
 
 const API_BASE = "http://127.0.0.1:8000/api";
 const APP_BASE = API_BASE.replace(/\/api$/, "");
@@ -97,7 +98,7 @@ export default function EditCategory() {
       fd.append("status", form.status);
       if (form.image_file) fd.append("image", form.image_file); // chỉ gửi nếu có file mới
 
-      const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
+      const token = getAdminToken() || "";
       const res = await fetch(`${API_BASE}/admin/categories/${id}`, {
         method: "POST",
         headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },

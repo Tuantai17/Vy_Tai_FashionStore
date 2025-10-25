@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ProductCard from "../../components/ProductCard";
+import CouponShowcase from "../../components/CouponShowcase";
+import ChatWidget from "../../components/ChatWidget";
 
 const API_BASE = "http://127.0.0.1:8000";
 const API = {
@@ -431,6 +433,8 @@ export default function Home() {
             )}
           </section>
 
+          <CouponShowcase />
+
           {/* Trạng thái */}
           {loading && <p style={{ textAlign: "center", color: "#e91e63" }}>Đang tải dữ liệu...</p>}
           {error && <p style={{ textAlign: "center", color: "#d32f2f" }}>{error}</p>}
@@ -543,6 +547,24 @@ export default function Home() {
 
         </>
       )}
+      {/* Fixed chat button + mini panel (Home only) */}
+      <HomeChatButton />
     </div>
+  );
+}
+
+function HomeChatButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="fixed bottom-5 right-5 z-[60] h-14 w-14 rounded-full shadow-xl bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center"
+        title="Mở trợ lý mini"
+      >
+        {open ? "×" : "💬"}
+      </button>
+      <ChatWidget open={open} onOpenChange={setOpen} hideButton={true} />
+    </>
   );
 }

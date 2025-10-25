@@ -27,6 +27,9 @@ return [
     */
 
     'artisan_key' => env('APP_ARTISAN_KEY'),
+    //chat
+    'frontend_origin' => env('APP_FRONTEND_ORIGIN', '*'), // ✅ THÊM
+
 
 
 

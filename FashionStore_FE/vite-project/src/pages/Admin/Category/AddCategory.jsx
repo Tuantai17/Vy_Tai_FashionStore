@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import { getAdminToken } from "../../../utils/authStorage";
 
 const API_BASE = "http://127.0.0.1:8000/api";
 const PLACEHOLDER = "https://placehold.co/120x120?text=No+Image";
@@ -56,7 +56,7 @@ export default function AddCategory() {
       fd.append("status", form.status);
       if (form.image) fd.append("image", form.image); // 👈 file ảnh thật
 
-      const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
+      const token = getAdminToken() || "";
       const res = await fetch(`${API_BASE}/admin/categories`, {
         method: "POST",
         headers: {

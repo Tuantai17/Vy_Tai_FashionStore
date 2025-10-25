@@ -1,9 +1,24 @@
 // Trash.jsx
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { getAdminToken } from "../../../utils/authStorage";
 
 const API_BASE = "http://127.0.0.1:8000/api";
 const APP_BASE = API_BASE.replace(/\/api$/, "");
+
+// Build a robust image URL from product record
+const buildImageUrl = (p) => {
+  if (!p) return "";
+  if (p.thumbnail_url) return p.thumbnail_url;
+  let th = p.thumbnail;
+  if (!th) return "";
+  th = String(th).replace(/^\/+/, "");
+  if (/^https?:\/\//i.test(th)) return th; // absolute URL
+  if (th.startsWith("assets/") || th.startsWith("images/") || th.startsWith("public/")) {
+    return `${APP_BASE}/${th.replace(/^public\//, "")}`;
+  }
+  return `${APP_BASE}/storage/${th}`;
+};
 
 export default function Trash() {
   const [items, setItems] = useState([]);
@@ -18,8 +33,7 @@ export default function Trash() {
   const [total, setTotal] = useState(0);
   const [lastPage, setLastPage] = useState(1);
 
-  const token =
-    localStorage.getItem("authToken") || localStorage.getItem("token") || "";
+  const token = getAdminToken();
 
   // ===== load trash with paginator =====
   const fetchTrash = async (signal) => {
@@ -28,7 +42,8 @@ export default function Trash() {
     usp.set("per_page", String(perPage));
     if (q.trim()) usp.set("q", q.trim());
 
-    const res = await fetch(`${API_BASE}/admin/products/trash?${usp.toString()}`, { signal });
+    const headers = { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+    const res = await fetch(`${API_BASE}/admin/products/trash?${usp.toString()}`, { signal, headers });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
@@ -416,9 +431,10 @@ export default function Trash() {
                   <td align="right" style={{ fontWeight: 600 }}>{p.qty}</td>
                   <td align="center">
                     <img
-                      src={p.thumbnail_url || `${APP_BASE}/storage/${p.thumbnail}`}
+                      src={buildImageUrl(p) || "https://placehold.co/160x120?text=No+Img"}
                       alt={p.name}
                       style={{ width: 60, height: 40, objectFit: "cover", borderRadius: 6 }}
+                      onError={(e) => (e.currentTarget.src = "https://placehold.co/160x120?text=No+Img")}
                     />
                   </td>
                   

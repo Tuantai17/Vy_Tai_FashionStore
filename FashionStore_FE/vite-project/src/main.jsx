@@ -1,7 +1,20 @@
 ﻿import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate, useLocation  } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  NavLink,
+  Navigate,
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
 import "./index.css";
+import {
+  getCustomerToken,
+  getCustomerUser,
+  clearCustomerSession,
+} from "./utils/authStorage";
 
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -21,7 +34,7 @@ import Profile from "./pages/Customers/Profile";
 import OrderTracking from "./pages/Customers/OrderTracking";
 import ReviewSection from "./pages/Customers/ReviewSection";
 import Wishlist from "./pages/Customers/Wishlist";
-
+import VoucherWarehouse from "./pages/Customers/VoucherWarehouse";
 
 
 
@@ -37,6 +50,7 @@ import AdminInventories from "./pages/Admin/Inventories/Inventories";
 
 import AdminCategories from "./pages/Admin/Category/Categories";
 import AdminOrders from "./pages/Admin/Order/Orders";
+import AdminCoupons from "./pages/Admin/Coupon/Coupons";
 import AdminUsers from "./pages/Admin/User/Users";
 import AddProduct from "./pages/Admin/Product/AddProduct";
 import EditProduct from "./pages/Admin/Product/EditProduct";
@@ -54,9 +68,10 @@ import Settings from "./pages/Admin/Settings/Settings.jsx";
 
 
 
+
 // ---- Hàm logout (gi? nguyên) ----
 const handleLogout = async () => {
-  const token = localStorage.getItem("token");
+  const token = getCustomerToken();
   try {
     if (token) {
       const res = await fetch("http://127.0.0.1:8000/api/logout", {
@@ -72,8 +87,7 @@ const handleLogout = async () => {
   } catch (err) {
     console.error("Logout failed:", err);
   } finally {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    clearCustomerSession();
     window.location.href = "/login";
   }
 };
@@ -273,7 +287,7 @@ function UserMenu({ user, onLogout }) {
 
 // ---- Layout cho ph?n khách hàng ----
 function Layout({ children }) {
-  const user = JSON.parse(localStorage.getItem("user") || "null");
+  const user = getCustomerUser();
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -541,9 +555,7 @@ function App() {
         <Route path="/track" element={<OrderTracking />} />
         <Route path="/me/orders" element={<Layout><MyOrders /></Layout>} />
         <Route path="/profile" element={<Layout><Profile /></Layout>} />
-        <Route path="/wishlist" element={<Layout><Wishlist /></Layout>} />
-
-
+        <Route path="/wishlist" element={<Layout><Wishlist /></Layout>} />\r\n        <Route path="/vouchers" element={<Layout><VoucherWarehouse /></Layout>} />\r\n\r\n
 
           <Route path="/canceled-orders" element={<Layout><CanceledOrders /></Layout>} />
 
@@ -570,13 +582,12 @@ function App() {
 
           <Route path="inventories" element={<AdminInventories />} />
 
-
-         
           <Route path="categories" element={<AdminCategories />} />
           <Route path="categories/:id" element={<ShowCategory />} />
           <Route path="categories/add" element={<AddCategory />} />
 
           <Route path="orders" element={<AdminOrders />} />
+          <Route path="coupons" element={<AdminCoupons />} />
           <Route path="users" element={<AdminUsers />} />
 
 

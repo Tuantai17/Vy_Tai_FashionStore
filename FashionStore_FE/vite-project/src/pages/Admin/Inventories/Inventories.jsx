@@ -1,5 +1,6 @@
 // src/pages/Admin/Inventory.jsx
 import { useEffect, useMemo, useState } from "react";
+import { getAdminToken } from "../../../utils/authStorage";
 
 const API = "http://127.0.0.1:8000/api";
 const APP_BASE = "http://127.0.0.1:8000";
@@ -20,7 +21,7 @@ export default function Inventory() {
   const [meta, setMeta] = useState(null);
   const [moves, setMoves] = useState([]);
   const [moveFor, setMoveFor] = useState(null);
-  const token = localStorage.getItem("token") || "";
+  const token = getAdminToken() || "";
 
   const fetchList = async (p = 1, keyword = "") => {
     const res = await fetch(

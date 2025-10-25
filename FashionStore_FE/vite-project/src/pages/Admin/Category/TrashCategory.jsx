@@ -1,6 +1,7 @@
 // CategoryTrash.jsx
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { getAdminToken } from "../../../utils/authStorage";
 
 const API_BASE = "http://127.0.0.1:8000/api";
 
@@ -17,8 +18,7 @@ export default function CategoryTrash() {
   const [total, setTotal] = useState(0);
   const [lastPage, setLastPage] = useState(1);
 
-  const token =
-    localStorage.getItem("authToken") || localStorage.getItem("token") || "";
+  const token = getAdminToken() || "";
 
   // ===== load trash with paginator =====
   const fetchTrash = async (signal) => {

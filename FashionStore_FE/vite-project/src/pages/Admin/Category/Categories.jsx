@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getAdminToken } from "../../../utils/authStorage";
 
 const API_BASE = "http://127.0.0.1:8000/api";
 const APP_BASE = API_BASE.replace(/\/api$/, "");
@@ -27,7 +28,7 @@ export default function Categories() {
 
   // ===== helpers auth header
   const authHeaders = () => {
-    const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
+    const token = getAdminToken() || "";
     return { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
   };
 
@@ -94,7 +95,7 @@ export default function Categories() {
   useEffect(() => { setPage(1); }, [view]);
 
   // ===== actions (logic unchanged)
-  const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
+  const token = getAdminToken() || "";
 
   const softDeleteOne = async (id) => {
     if (!window.confirm(`Move category #${id} to Trash?`)) return;

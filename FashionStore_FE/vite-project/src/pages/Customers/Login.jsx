@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { setCustomerSession } from "../../utils/authStorage";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -57,12 +58,7 @@ export default function Login() {
       } catch {}
 
       if (res.ok) {
-        if (data.token) {
-          localStorage.setItem("token", data.token);
-        }
-        if (data.user) {
-          localStorage.setItem("user", JSON.stringify(data.user));
-        }
+        setCustomerSession({ token: data.token, user: data.user });
 
         alert(data.message || "Dang nhap thanh cong!");
         navigate("/");

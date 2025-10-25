@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
+import { getCustomerToken, getCustomerUser } from "../../utils/authStorage";
 
 const API_BASE = "http://127.0.0.1:8000/api";
 
@@ -19,10 +20,10 @@ export default function ReviewSection({ productId }) {
   const [error, setError] = useState("");
   const [canReview, setCanReview] = useState(false);
 
-  const token = localStorage.getItem("token");
+  const token = getCustomerToken();
   const user = (() => {
     try {
-      return JSON.parse(localStorage.getItem("user") || "null");
+      return getCustomerUser();
     } catch {
       return null;
     }
@@ -419,3 +420,5 @@ return;
     </div>
   );
 }
+
+

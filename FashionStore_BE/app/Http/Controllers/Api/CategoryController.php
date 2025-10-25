@@ -12,6 +12,7 @@ class CategoryController extends Controller
     public function index()
     {
         $cats = Category::select(['id', 'name', 'slug', 'image', 'parent_id', 'sort_order', 'description', 'status'])
+            ->distinct()
             ->latest('id')
             ->get();
 
@@ -28,6 +29,7 @@ class CategoryController extends Controller
     public function adminIndex(Request $request)
     {
         $query = Category::select(['id', 'name', 'slug', 'image', 'parent_id', 'sort_order', 'description', 'status'])
+            ->distinct()
             ->latest('id');
 
         $perPage = (int) $request->query('per_page', 10);
@@ -174,6 +176,7 @@ class CategoryController extends Controller
 
         $query = Category::onlyTrashed()
             ->select(['id', 'name', 'slug', 'image', 'parent_id', 'sort_order', 'description', 'status'])
+            ->distinct()
             ->latest('deleted_at');
 
         if ($q !== '') {

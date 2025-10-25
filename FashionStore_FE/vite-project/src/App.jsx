@@ -10,6 +10,9 @@ import Cart from "./pages/Customers/Cart";
 import PaymentResult from "./pages/Customers/PaymentResult";
 
 
+// Global mini ChatWidget is rendered below (persistent floating)
+// Mini ChatWidget is used on Home only
+
 function App() {
 
   return (
@@ -31,7 +34,6 @@ function App() {
 
 
   <Route path="/momo/return" element={<PaymentResult />} />
-
 
       </Routes>
     </BrowserRouter>

@@ -51,16 +51,15 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
 
 
 Route::get('/coupons', [PublicCouponController::class, 'index']);
-// public/apply (khï¿½ng c?n admin)
+// public/apply (kh�ng c?n admin)
 Route::post('/coupons/apply', [CouponController::class, 'apply']); // body: {code, subtotal}
 
 
 //chat ai
 
 Route::middleware('throttle:60,1')->group(function () {
-    Route::get('/chat/stream', [ChatController::class, 'stream']);   // SSE (GET ?message=...)
-    Route::post('/chat',       [ChatController::class, 'chat']);     // JSON fallback
-    Route::post('/chat/save',  [ChatController::class, 'save']);     // Luu transcript (optional)
+    Route::get('/chat/stream', [ChatController::class, 'stream']);   // SSE
+    Route::post('/chat/save', [ChatController::class, 'save']);      // Lưu transcript (optional)
 });
 
 // (optional) tool routes
@@ -71,9 +70,9 @@ Route::get('/chat/tools/search-products', [\App\Http\Controllers\Api\ProductCont
 
 ///--------------------------------------
 // //momo
-// Route::post('/payments/momo/create', [MomoController::class, 'create']);  // t?o l?nh thanh toï¿½n
+// Route::post('/payments/momo/create', [MomoController::class, 'create']);  // t?o l?nh thanh to�n
 // Route::post('/payments/momo/ipn',    [MomoController::class, 'ipn']);     // MoMo g?i v? (server-to-server)
-// Route::get('/payments/momo/return',  [MomoController::class, 'return']);  // ngu?i dï¿½ng quay l?i site
+// Route::get('/payments/momo/return',  [MomoController::class, 'return']);  // ngu?i d�ng quay l?i site
 // // routes/api.php
 // Route::get('/ping', fn() => response()->json(['ok' => true]));
 
@@ -103,14 +102,14 @@ Route::get('/momo/status', function (Request $req) {
     if (!$payment) {
         return response()->json([
             'resultCode' => 7002,
-            'message'    => 'Chua cï¿½ thï¿½ng tin thanh toï¿½n.'
+            'message'    => 'Chua c� th�ng tin thanh to�n.'
         ]);
     }
 
     return response()->json([
         'orderId'    => $payment->order_id,
         'resultCode' => (int) $payment->result_code,
-        'message'    => $payment->message ?? 'ï¿½ang x? lï¿½',
+        'message'    => $payment->message ?? '�ang x? l�',
         'amount'     => (int) $payment->amount,
         'transId'    => $payment->trans_id,
         'method'     => $payment->method,
@@ -153,7 +152,7 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::get('/products',      [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/categories/{id}/products', [ProductController::class, 'byCategory'])->whereNumber('id');
-// ? Danh sï¿½ch s?n ph?m theo danh m?c (public)
+// ? Danh s�ch s?n ph?m theo danh m?c (public)
 Route::get('/categories/{id}/products', [ProductController::class, 'byCategory']);
 
 
@@ -168,10 +167,10 @@ Route::get('/categories/{id}',     [CategoryController::class, 'show']);
 Route::put('/admin/categories/{id}', [CategoryController::class, 'update']);
 
 Route::prefix('admin')->group(function () {
-    // ? li?t kï¿½ dang ho?t d?ng (paginator)
+    // ? li?t k� dang ho?t d?ng (paginator)
     Route::get('/categories', [CategoryController::class, 'adminIndex']);
 
-    // ? TRASH tru?c {id} d? khï¿½ng b? nu?t
+    // ? TRASH tru?c {id} d? kh�ng b? nu?t
     Route::get('/categories/trash', [CategoryController::class, 'trash']);
 
     // ? CRUD
@@ -198,12 +197,12 @@ Route::get('/orders/{order}', [OrderController::class, 'show'])->whereNumber('or
 
 Route::post('/orders/{order}/cancel', [OrderController::class, 'cancelById']);
 Route::post('/orders/cancel', [OrderController::class, 'cancel']);
-// C?p nh?t ti?n trï¿½nh (ghi status_step/step_code) ï¿½ KHï¿½NG trï¿½ng l?p
+// C?p nh?t ti?n tr�nh (ghi status_step/step_code) � KH�NG tr�ng l?p
 Route::match(['put', 'patch'], '/orders/{order}',        [OrderController::class, 'updateStatusStep'])->whereNumber('order');
 Route::match(['post', 'put'],  '/orders/{order}/status', [OrderController::class, 'updateStatusStep'])->whereNumber('order');
 Route::post('/orders/update-status', [OrderController::class, 'updateStatusStepById']);
 
-// ===== My Orders (c?n Bearer) ï¿½ TR? LUï¿½N total d? FE hi?n th? =====
+// ===== My Orders (c?n Bearer) � TR? LU�N total d? FE hi?n th? =====
 Route::middleware('auth:sanctum')->get('/my-orders', [OrderController::class, 'mine']);
 
 // Checkout
@@ -221,7 +220,7 @@ Route::prefix('admin')->group(function () {
 // Route::get('/admin/users', [UserController::class, 'index']);
 
 
-// ===== Users (Admin qu?n lï¿½ user) ï¿½ B?N ï¿½ANG THI?U NHï¿½M Nï¿½Y =====
+// ===== Users (Admin qu?n l� user) � B?N �ANG THI?U NH�M N�Y =====
 // ===== Admin: Users =====
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('/users',           [UserController::class, 'index']);
@@ -232,3 +231,4 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::post('/users/{id}/lock',   [UserController::class, 'lock']);
     Route::post('/users/{id}/unlock', [UserController::class, 'unlock']);
 });
+

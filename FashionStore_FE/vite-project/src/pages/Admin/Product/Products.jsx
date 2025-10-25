@@ -1,9 +1,40 @@
 ﻿// src/pages/Admin/Product/Products.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getAdminToken } from "../../../utils/authStorage";
 
-const API_BASE = "http://127.0.0.1:8000/api";
-const APP_BASE = API_BASE.replace(/\/api$/, "");
+/* ==== BASE URL (ưu tiên .env) ==== */
+const API_BASE = (import.meta.env?.VITE_API_BASE || "http://127.0.0.1:8000") + "/api";
+const APP_BASE = API_BASE.replace(/\/api$/, ""); // http://127.0.0.1:8000
+
+/* ==== Build URL ảnh an toàn (ưu tiên thumbnail_url từ BE) ==== */
+const buildImageUrl = (p) => {
+  if (!p) return "";
+
+  // 1) BE accessor đã chuẩn -> dùng ngay
+  if (p.thumbnail_url && typeof p.thumbnail_url === "string") {
+    return p.thumbnail_url.trim();
+  }
+
+  // 2) Fallback theo thumbnail thô trong DB
+  let th = (p.thumbnail || "").toString().trim();
+  if (!th) return "";
+
+  // a) Đã là URL tuyệt đối
+  if (/^https?:\/\//i.test(th)) return th;
+
+  // b) Xử lý các trường hợp để trong public/
+  th = th.replace(/^\/+/, ""); // bỏ slash đầu
+  if (th.startsWith("public/")) th = th.slice(7); // public/images/.. -> images/..
+
+  if (th.startsWith("assets/") || th.startsWith("images/")) {
+    // file nằm ngay trong public
+    return `${APP_BASE}/${th}`;
+  }
+
+  // c) Mặc định: file đã lưu qua disk 'public' => storage/app/public/...
+  return `${APP_BASE}/storage/${th}`;
+};
 
 export default function Products() {
   const [items, setItems] = useState([]);
@@ -13,21 +44,30 @@ export default function Products() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [view, setView] = useState("active"); // "active" | "trash"
 
-  // ====== filters ======
+  // ===== filters =====
   const [categories, setCategories] = useState([]);
   const [category, setCategory] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
-  // Tập ID sản phẩm thuộc danh mục (để lọc client-side)
   const [catProductIds, setCatProductIds] = useState(null);
 
-  // ===== phân trang =====
+  // ===== paging =====
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
   const perPage = 10;
 
   const navigate = useNavigate();
+  const authHeaders = (extra = {}) => {
+    const token = getAdminToken();
+    const headers = {
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...extra,
+    };
+    Object.keys(headers).forEach((k) => headers[k] == null && delete headers[k]);
+    return headers;
+  };
 
   // ===== THEME =====
   const colors = {
@@ -69,7 +109,7 @@ export default function Products() {
     cursor: "pointer",
   });
 
-  // ===== load categories for filter =====
+  /* ==== Load categories ==== */
   useEffect(() => {
     (async () => {
       try {
@@ -82,7 +122,7 @@ export default function Products() {
     })();
   }, []);
 
-  // ===== fetch theo view + page (giữ nguyên logic) =====
+  /* ==== Fetch list by view + page ==== */
   useEffect(() => {
     const ac = new AbortController();
     (async () => {
@@ -95,7 +135,7 @@ export default function Products() {
             ? `${API_BASE}/admin/products/trash?per_page=${perPage}&page=${page}`
             : `${API_BASE}/admin/products?per_page=${perPage}&page=${page}`;
 
-        const res = await fetch(endpoint, { signal: ac.signal });
+        const res = await fetch(endpoint, { signal: ac.signal, headers: authHeaders() });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
@@ -120,16 +160,10 @@ export default function Products() {
     return () => ac.abort();
   }, [view, page]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [view]);
+  useEffect(() => setPage(1), [view]);
+  useEffect(() => setPage(1), [q, category, minPrice, maxPrice]);
 
-  // Khi đổi bộ lọc (q/category/min/max) → về trang 1
-  useEffect(() => {
-    setPage(1);
-  }, [q, category, minPrice, maxPrice]);
-
-  // ===== tải ID sản phẩm thuộc danh mục đang chọn (để lọc client) =====
+  /* ==== Load IDs sản phẩm của danh mục đang chọn (để lọc client) ==== */
   useEffect(() => {
     let ignore = false;
     (async () => {
@@ -138,16 +172,14 @@ export default function Products() {
         return;
       }
       try {
-        const res = await fetch(
-          `${APP_BASE}/api/categories/${category}/products?per_page=-1`
-        );
+        const res = await fetch(`${APP_BASE}/api/categories/${category}/products?per_page=-1`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const list = Array.isArray(data) ? data : data.data ?? [];
         if (!ignore) setCatProductIds(new Set(list.map((p) => p.id)));
       } catch (e) {
         console.error("Load category products failed:", e);
-        if (!ignore) setCatProductIds(new Set()); // rỗng rõ ràng khi lỗi
+        if (!ignore) setCatProductIds(new Set());
       }
     })();
     return () => {
@@ -155,16 +187,15 @@ export default function Products() {
     };
   }, [category]);
 
-  // ===== hành động đơn lẻ/bulk (giữ nguyên) =====
+  /* ==== Actions giữ nguyên ==== */
   const handleSoftDelete = async (id) => {
     if (!window.confirm(`Xoá tạm sản phẩm #${id}?`)) return;
-    const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
     try {
       const fd = new FormData();
       fd.append("_method", "DELETE");
       const res = await fetch(`${API_BASE}/admin/products/${id}`, {
         method: "POST",
-        headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: authHeaders(),
         body: fd,
       });
       if (!res.ok) throw new Error("Xoá tạm thất bại");
@@ -176,7 +207,6 @@ export default function Products() {
         return next;
       });
       alert("✅ Đã chuyển vào Thùng rác");
-
       if (items.length === 1 && page > 1) setPage((p) => p - 1);
     } catch (e) {
       alert("❌ " + (e.message || "Không xoá tạm được"));
@@ -184,11 +214,10 @@ export default function Products() {
   };
 
   const handleRestore = async (id) => {
-    const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
     try {
       const res = await fetch(`${API_BASE}/admin/products/${id}/restore`, {
         method: "POST",
-        headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: authHeaders(),
       });
       if (!res.ok) throw new Error("Khôi phục thất bại");
       setItems((list) => list.filter((x) => x.id !== id));
@@ -198,7 +227,6 @@ export default function Products() {
         return next;
       });
       alert("✅ Đã khôi phục");
-
       if (items.length === 1 && page > 1) setPage((p) => p - 1);
     } catch (e) {
       alert("❌ " + (e.message || "Không khôi phục được"));
@@ -207,11 +235,10 @@ export default function Products() {
 
   const handleForceDelete = async (id) => {
     if (!window.confirm(`Xóa vĩnh viễn sản phẩm #${id}? Hành động không thể hoàn tác!`)) return;
-    const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
     try {
       const res = await fetch(`${API_BASE}/admin/products/${id}/force-delete`, {
         method: "POST",
-        headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: authHeaders(),
       });
       if (!res.ok) throw new Error("Xóa vĩnh viễn thất bại");
       setItems((list) => list.filter((x) => x.id !== id));
@@ -221,7 +248,6 @@ export default function Products() {
         return next;
       });
       alert("🗑️ Đã xóa vĩnh viễn");
-
       if (items.length === 1 && page > 1) setPage((p) => p - 1);
     } catch (e) {
       alert("❌ " + (e.message || "Không xóa vĩnh viễn được"));
@@ -230,8 +256,6 @@ export default function Products() {
 
   const handleBulkAction = async (action) => {
     if (selectedIds.size === 0) return;
-
-    const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
     const ids = Array.from(selectedIds);
 
     if (action === "soft-delete") {
@@ -244,7 +268,7 @@ export default function Products() {
             fd.append("_method", "DELETE");
             const res = await fetch(`${API_BASE}/admin/products/${id}`, {
               method: "POST",
-              headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+              headers: authHeaders(),
               body: fd,
             });
             if (!res.ok) throw new Error();
@@ -268,7 +292,7 @@ export default function Products() {
           try {
             const res = await fetch(`${API_BASE}/admin/products/${id}/restore`, {
               method: "POST",
-              headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+              headers: authHeaders(),
             });
             if (!res.ok) throw new Error();
             ok++;
@@ -292,7 +316,7 @@ export default function Products() {
           try {
             const res = await fetch(`${API_BASE}/admin/products/${id}/force-delete`, {
               method: "POST",
-              headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+              headers: authHeaders(),
             });
             if (!res.ok) throw new Error();
             ok++;
@@ -321,10 +345,8 @@ export default function Products() {
     navigate(`/admin/products/${id}/edit`);
   };
 
-  // ===== helpers filter =====
   const priceOf = (p) => Number(p.price_sale ?? p.sale_price ?? p.price_root ?? p.price ?? 0);
 
-  // ===== filter client (keyword + category bằng ID + price) =====
   const filtered = useMemo(() => {
     let list = items;
 
@@ -339,9 +361,8 @@ export default function Products() {
       );
     }
 
-    // category (dựa trên ID lấy từ /api/categories/:id/products)
+    // category filter
     if (category) {
-      // Chưa tải xong -> coi như chưa có dữ liệu để hiển thị (tránh nhấp nháy sai)
       if (catProductIds == null) return [];
       list = list.filter((p) => catProductIds.has(p.id));
     }
@@ -355,7 +376,6 @@ export default function Products() {
     return list;
   }, [items, q, category, catProductIds, minPrice, maxPrice]);
 
-  // ===== chọn/bỏ chọn (giữ nguyên) =====
   const toggleOne = (id) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -378,7 +398,6 @@ export default function Products() {
     });
   };
 
-  // ===== điều khiển trang (giữ nguyên) =====
   const gotoPage = (p) => {
     if (p < 1 || p > lastPage || p === page) return;
     setPage(p);
@@ -418,7 +437,7 @@ export default function Products() {
         Product Management {view === "trash" ? "— Trash" : ""}
       </h2>
 
-      {/* Thanh tìm + action */}
+      {/* Top bar */}
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <input
           value={q}
@@ -435,7 +454,7 @@ export default function Products() {
           }}
         />
 
-        {/* CHỈ hiện Import/Export ở view ACTIVE */}
+        {/* Import/Export chỉ ở view ACTIVE */}
         {view === "active" && (
           <>
             <input
@@ -449,14 +468,10 @@ export default function Products() {
                 const fd = new FormData();
                 fd.append("file", file);
 
-                const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
                 try {
                   const res = await fetch(`${API_BASE}/admin/products/import`, {
                     method: "POST",
-                    headers: {
-                      Accept: "application/json",
-                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                    },
+                    headers: authHeaders(),
                     body: fd,
                   });
                   const j = await res.json();
@@ -480,10 +495,9 @@ export default function Products() {
 
             <button
               onClick={async () => {
-                const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
                 try {
                   const res = await fetch(`${API_BASE}/admin/products/export`, {
-                    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                    headers: authHeaders({ Accept: undefined }),
                   });
                   if (!res.ok) throw new Error("Export lỗi");
                   const blob = await res.blob();
@@ -515,7 +529,6 @@ export default function Products() {
               Show
             </button>
 
-            {/* Add kiểu giống các nút khác */}
             <button
               onClick={() => navigate("/admin/products/new")}
               style={btnBase(false)}
@@ -561,15 +574,12 @@ export default function Products() {
           </>
         )}
 
-        <button
-          onClick={() => setView((v) => (v === "active" ? "trash" : "active"))}
-          style={btnBase(false)}
-        >
+        <button onClick={() => setView((v) => (v === "active" ? "trash" : "active"))} style={btnBase(false)}>
           {view === "trash" ? "← Product List" : "Trash"}
         </button>
       </div>
 
-      {/* === FILTER BAR === */}
+      {/* FILTER BAR */}
       <div
         style={{
           display: "flex",
@@ -582,7 +592,6 @@ export default function Products() {
           border: "1px solid rgba(255,255,255,0.2)",
         }}
       >
-        {/* Category */}
         <div>
           <label style={{ fontSize: 14, fontWeight: 600, display: "block", marginBottom: 4 }}>
             Category
@@ -614,7 +623,6 @@ export default function Products() {
           </select>
         </div>
 
-        {/* Price from */}
         <div>
           <label style={{ fontSize: 14, fontWeight: 600, display: "block", marginBottom: 4 }}>
             Price from
@@ -635,7 +643,6 @@ export default function Products() {
           />
         </div>
 
-        {/* Price to */}
         <div>
           <label style={{ fontSize: 14, fontWeight: 600, display: "block", marginBottom: 4 }}>
             To
@@ -656,7 +663,6 @@ export default function Products() {
           />
         </div>
 
-        {/* Reset */}
         <div style={{ alignSelf: "flex-end" }}>
           <button
             onClick={() => {
@@ -681,7 +687,6 @@ export default function Products() {
       {loading && <p style={{ color: "#ddd" }}>Đang tải dữ liệu…</p>}
       {err && <p style={{ color: "salmon" }}>{err}</p>}
 
-      {/* BẢNG (không cột hành động) + PHÂN TRANG CỐ ĐỊNH */}
       {!loading && (
         <div
           style={{
@@ -718,11 +723,7 @@ export default function Products() {
               {filtered.map((p) => (
                 <tr key={p.id} style={{ borderTop: `1px solid ${colors.border}` }}>
                   <td style={{ padding: 8, textAlign: "center" }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(p.id)}
-                      onChange={() => toggleOne(p.id)}
-                    />
+                    <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleOne(p.id)} />
                   </td>
                   <td style={{ padding: 8 }}>{p.id}</td>
                   <td style={{ padding: 8, fontWeight: 700 }}>{p.name}</td>
@@ -736,7 +737,7 @@ export default function Products() {
                   <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{p.qty}</td>
                   <td style={{ padding: 8, textAlign: "center" }}>
                     <img
-                      src={p.thumbnail_url || `${APP_BASE}/storage/${p.thumbnail}`}
+                      src={buildImageUrl(p) || "https://placehold.co/120x80?text=No+Img"}
                       alt={p.name}
                       style={{
                         width: 60,
@@ -760,7 +761,6 @@ export default function Products() {
             </tbody>
           </table>
 
-          {/* PHÂN TRANG CỐ ĐỊNH */}
           {lastPage > 1 && (
             <div
               style={{

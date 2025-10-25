@@ -1,6 +1,7 @@
-// src/pages/Customers/CanceledOrders.jsx
+﻿// src/pages/Customers/CanceledOrders.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getCustomerToken, getCustomerUser } from "../../utils/authStorage";
 
 const API_BASE = "http://127.0.0.1:8000/api";
 const PLACEHOLDER = "https://placehold.co/64x48?text=No+Img";
@@ -8,10 +9,8 @@ const ORDER_TRACK_PATH = "/track";
 
 export default function CanceledOrders() {
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
-  const user = (() => {
-    try { return JSON.parse(localStorage.getItem("user") || "null"); } catch { return null; }
-  })();
+  const token = getCustomerToken();
+  const user = getCustomerUser();
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -298,3 +297,4 @@ function Style() {
     `}</style>
   );
 }
+

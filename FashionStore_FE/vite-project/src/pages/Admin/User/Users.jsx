@@ -1,5 +1,6 @@
 // src/pages/Admin/User/Users.jsx
 import { useEffect, useMemo, useState } from "react";
+import { getAdminToken } from "../../../utils/authStorage";
 
 const API_BASE = "http://127.0.0.1:8000/api";
 const PER_PAGE = 10;
@@ -15,7 +16,7 @@ export default function Users() {
   const [lastPage, setLast]   = useState(1);
   const [total, setTotal]     = useState(0);
 
-  const token = localStorage.getItem("token");
+  const token = getAdminToken();
 
   useEffect(() => {
     const ac = new AbortController();
@@ -256,3 +257,6 @@ export default function Users() {
     </div>
   );
 }
+
+
+

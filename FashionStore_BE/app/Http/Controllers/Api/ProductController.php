@@ -208,7 +208,11 @@ class ProductController extends Controller
         if ($request->boolean('all') || $perPage === -1) {
             // Trả full list (không phân trang) khi yêu cầu all
             $items = $query->get();
-            $items->transform(fn($m) => $m->makeHidden(['brand', 'brand_id']));
+            // Đảm bảo luôn kèm theo 'thumbnail_url' để FE hiển thị ảnh ổn định
+            $items->transform(function ($m) {
+                $m->append('thumbnail_url');
+                return $m->makeHidden(['brand', 'brand_id']);
+            });
             return response()->json($items);
         }
 
@@ -216,7 +220,10 @@ class ProductController extends Controller
 
         // ⬇️ paginate + transform collection bên trong
         $paginator = $query->paginate($perPage);
-        $paginator->getCollection()->transform(fn($m) => $m->makeHidden(['brand', 'brand_id']));
+        $paginator->getCollection()->transform(function ($m) {
+            $m->append('thumbnail_url');
+            return $m->makeHidden(['brand', 'brand_id']);
+        });
 
         // Trả paginator để FE đọc được current_page, last_page, total...
         return response()->json($paginator);
@@ -362,7 +369,14 @@ class ProductController extends Controller
             });
         }
 
-        return $query->paginate($perPage)->appends($request->query());
+        $paginator = $query->paginate($perPage);
+        // Thêm thumbnail_url cho mỗi record trong thùng rác
+        $paginator->getCollection()->transform(function ($m) {
+            $m->append('thumbnail_url');
+            return $m;
+        });
+
+        return $paginator->appends($request->query());
     }
 
     // ============ RESTORE ============

@@ -1,18 +1,11 @@
-// src/pages/Customers/MyOrders.jsx
+﻿// src/pages/Customers/MyOrders.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getCustomerToken } from "../../utils/authStorage";
 
 const API_BASE = "http://127.0.0.1:8000/api";
 
 /* ================= Helpers ================= */
-function getCustomerToken() {
-  return (
-    localStorage.getItem("mbs.customer.token") ||
-    localStorage.getItem("mbs.customerToken") ||
-    localStorage.getItem("token") ||
-    ""
-  );
-}
 
 function formatVND(n) {
   const v = Number(n ?? 0);
@@ -185,7 +178,9 @@ export default function MyOrders() {
                     <tr key={o.id || o.code}>
                       <td className="cell-strong">#{o.code || o.id}</td>
                       <td>{toDateTimeString(o.created_at || o.createdAt)}</td>
-                      <td className="cell-strong">{formatVND(o.total_price ?? o.total ?? 0)}</td>
+                      <td className="cell-strong">
+                        {formatVND(o.total_due ?? o.total ?? o.total_price ?? 0)}
+                      </td>
                       <td><span style={statusBadgeStyle(statusKey)}>{label}</span></td>
                       <td className="cell-actions">
                         <button className="btn ghost" onClick={() => toTrack(o)}>Xem chi tiết</button>
@@ -303,3 +298,6 @@ function Style() {
     `}</style>
   );
 }
+
+
+

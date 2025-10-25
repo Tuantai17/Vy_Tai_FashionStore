@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getAdminToken } from "../../utils/authStorage";
 
 const APP_BASE = "http://127.0.0.1:8000";
 const API_BASE = `${APP_BASE}/api`;
@@ -7,7 +8,7 @@ const VND = new Intl.NumberFormat("vi-VN");
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const token = localStorage.getItem("authToken") || localStorage.getItem("token") || "";
+  const token = getAdminToken() || "";
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");

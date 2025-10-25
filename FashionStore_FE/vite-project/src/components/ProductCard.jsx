@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 import { wishlistToggle } from "../lib/wishlist";
+import { getCustomerToken } from "../utils/authStorage";
 
 const PLACEHOLDER = "https://placehold.co/300x200?text=No+Image";
 
@@ -10,7 +11,6 @@ export default function ProductCard({ p }) {
   const imgSrc = p.image || p.thumbnail_url || p.thumbnail || PLACEHOLDER;
   const navigate = useNavigate();
   const [liked, setLiked] = useState(Boolean(p.is_liked));
-  const token = localStorage.getItem("token");
 
   const categoryName =
     p.category_name ||
@@ -71,7 +71,8 @@ export default function ProductCard({ p }) {
   }, [p.id]);
 
   const ensureAuth = () => {
-    if (token) return true;
+    const tk = getCustomerToken();
+    if (tk) return true;
     navigate("/login");
     return false;
   };

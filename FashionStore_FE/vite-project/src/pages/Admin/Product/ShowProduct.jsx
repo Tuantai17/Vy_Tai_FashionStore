@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import DOMPurify from "dompurify";
+import { getAdminToken } from "../../../utils/authStorage";
 
 const API_BASE = "http://127.0.0.1:8000/api";
 const APP_BASE = API_BASE.replace(/\/api$/, "");
@@ -9,7 +10,6 @@ const PLACEHOLDER = "https://placehold.co/600x400?text=No+Image";
 const VND = new Intl.NumberFormat("vi-VN");
 
 // ===== helpers =====
-const ADMIN_TOKEN_KEY = "admin_token";
 const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
 const pick = (...xs) => xs.find((x) => x !== undefined && x !== null && x !== "") ?? undefined;
 
@@ -38,6 +38,20 @@ function normalizeProduct(p) {
     updated_at: p.updated_at,
   };
 }
+
+// Resolve a robust image URL for admin detail
+const buildImageUrl = (p) => {
+  if (!p) return "";
+  if (p.thumbnail_url) return p.thumbnail_url;
+  let th = p.thumbnail;
+  if (!th) return "";
+  th = String(th).replace(/^\/+/, "");
+  if (/^https?:\/\//i.test(th)) return th;
+  if (th.startsWith("assets/") || th.startsWith("images/") || th.startsWith("public/")) {
+    return `${APP_BASE}/${th.replace(/^public\//, "")}`;
+  }
+  return `${APP_BASE}/storage/${th}`;
+};
 
 export default function ShowProduct() {
   const { id } = useParams();
@@ -69,7 +83,7 @@ export default function ShowProduct() {
         setErr("");
 
         // 1) Lấy chi tiết sản phẩm (admin) — kèm token nếu có
-        const token = localStorage.getItem(ADMIN_TOKEN_KEY) || localStorage.getItem("token");
+        const token = getAdminToken();
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
         const raw = await json(`${API_BASE}/admin/products/${id}`, { headers });
         if (!raw) throw new Error("Không tải được chi tiết sản phẩm.");
@@ -111,9 +125,7 @@ export default function ShowProduct() {
   if (err) return <div style={{ padding: 20, color: "red" }}>{err}</div>;
   if (!product) return <div style={{ padding: 20 }}>Không tìm thấy sản phẩm.</div>;
 
-  const imgSrc =
-    product.thumbnail_url ||
-    (product.thumbnail ? `${APP_BASE}/storage/${product.thumbnail}` : PLACEHOLDER);
+  const imgSrc = buildImageUrl(product) || PLACEHOLDER;
 
   return (
     <section

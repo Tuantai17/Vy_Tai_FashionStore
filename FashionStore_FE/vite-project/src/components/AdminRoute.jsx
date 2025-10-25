@@ -1,11 +1,11 @@
-// src/components/AdminRoute.jsx
 import { Navigate } from "react-router-dom";
+import { getAdminUser, getAdminToken } from "../utils/authStorage";
 
 export default function AdminRoute({ children }) {
-  const user = JSON.parse(localStorage.getItem("user") || "null");
+  const user = getAdminUser();
+  const token = getAdminToken();
 
-  // Nếu chưa login hoặc không phải admin => redirect về trang login
-  if (!user || user.roles !== "admin") {
+  if (!user || !token || user.roles !== "admin") {
     return <Navigate to="/admin/login" replace />;
   }
 

@@ -1,33 +1,46 @@
 <?php
 
+// Helper: parse danh sách origins từ ENV (phân tách bởi dấu phẩy)
+$envOrigins = array_filter(array_map('trim', explode(',', env('APP_FRONTEND_ORIGINS', ''))));
+
 return [
 
-    // Chỉ cần cho API (và sanctum/csrf-cookie nếu bạn có dùng Sanctum ở đâu đó)
+    // Áp dụng cho API (và Sanctum nếu dùng cookie)
     'paths' => ['api/*', 'sanctum/csrf-cookie'],
 
+    // Cho phép mọi method (bao gồm OPTIONS cho preflight)
     'allowed_methods' => ['*'],
 
-    // FE được phép gọi API
-    // LƯU Ý: KHÔNG để domain của BE ở đây (vd: *.up.railway.app / onrender.com)
-    // Có thể lấy từ ENV để khỏi hardcode
-    'allowed_origins' => array_filter([
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        env('FRONTEND_URL', null),   // https://vy-tai-fashion-store-ud16.vercel.app
-    ]),
+    // Danh sách origin cụ thể (không đưa domain BE vào đây)
+    // - APP_FRONTEND_ORIGIN: 1 origin chính (ví dụ localhost)
+    // - APP_FRONTEND_ORIGINS: nhiều origin, ngăn cách bởi dấu phẩy (VD: vercel, staging…)
+    'allowed_origins' => array_values(array_filter([
+        env('APP_FRONTEND_ORIGIN', null), // ví dụ: http://localhost:5173
+        ...$envOrigins,                   // ví dụ: https://yourapp.vercel.app, https://staging.example.com
+    ])),
 
+    // Regex cho các domain động (subdomain)
+    // - Vercel: https://*.vercel.app
+    // - Ngrok:  https://*.ngrok-free.app (tuỳ bạn có dùng hay không)
+    'allowed_origins_patterns' => [
+        '#^https://[a-z0-9-]+\.vercel\.app$#i',
+        '#^https://[a-z0-9-]+\.ngrok-free\.app$#i',
+    ],
 
-    'allowed_origins_patterns' => [],
-
-    // Cho phép mọi header phổ biến (Authorization, Content-Type, v.v.)
+    // Header được phép gửi lên
     'allowed_headers' => ['*'],
 
-    // Nếu cần đọc một số header response tùy biến thì liệt kê ở đây
-    'exposed_headers' => [],
+    // Header response mà FE có thể đọc (hữu ích khi debug SSE/Cache)
+    'exposed_headers' => [
+        'Content-Type',
+        'Cache-Control',
+        'X-Accel-Buffering',
+        'Vary',
+    ],
 
     'max_age' => 0,
 
-    // DÙNG BEARER TOKEN => để false (không gửi/nhận cookie)
-    // Nếu sau này chuyển qua cookie/Sanctum SPA thì đổi thành true và cấu hình SANCTUM_STATEFUL_DOMAINS + SESSION_DOMAIN.
+    // Dùng Bearer token (không cookie) -> để false.
+    // Nếu chuyển qua cookie/Sanctum SPA: chỉnh true và set SANCTUM_STATEFUL_DOMAINS + SESSION_DOMAIN.
     'supports_credentials' => false,
 ];

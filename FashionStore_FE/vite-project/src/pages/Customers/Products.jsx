@@ -10,8 +10,6 @@ const API = {
   products: `${API_BASE}/api/products?per_page=-1`,
   catProducts: (id) => `${API_BASE}/api/categories/${id}/products?per_page=-1`,
 };
-const PLACEHOLDER = "https://placehold.co/300x200?text=No+Image";
-
 export default function Products({ addToCart }) {
   const location = useLocation();
   const defaultCate = location.state?.categoryId ?? "";
@@ -298,13 +296,7 @@ export default function Products({ addToCart }) {
         {filtered.length > 0 ? (
           filtered.map((p) => (
             <div key={p.id} className="pcell">
-              <ProductCard
-                p={{
-                  ...p,
-                  image:
-                    p.image_url || p.thumbnail_url || p.thumbnail || p.image || PLACEHOLDER,
-                }}
-              />
+              <ProductCard p={p} />
             </div>
           ))
         ) : (

@@ -43,23 +43,56 @@ class WishlistController extends Controller
         $user = $request->user();
         $pid  = (int) $request->product_id;
 
-        $existing = Wishlist::where('user_id', $user->id)->where('product_id', $pid)->first();
+        $existing = Wishlist::where('user_id', $user->id)
+            ->where('product_id', $pid)
+            ->first();
 
+        // If exists -> remove from wishlist
         if ($existing) {
             $existing->delete();
-            return response()->json(['message' => 'Removed']);
+            return response()->json([
+                'message'    => 'Removed',
+                'liked'      => false,
+                'product_id' => $pid,
+            ]);
         }
 
+        // Else -> add to wishlist and return normalized item for FE
         Wishlist::create(['user_id' => $user->id, 'product_id' => $pid]);
-        return response()->json(['message' => 'Added']);
+
+        $p = Product::with(['category:id,name', 'brand:id,name'])->find($pid);
+        $price = (float) ($p?->price_sale ?? $p?->price_root ?? 0);
+
+        $item = [
+            'wishlist_id'   => null, // ID của bản ghi có thể không cần thiết ngay thời điểm trả về
+            'id'            => $p->id,
+            'name'          => $p->name,
+            'price'         => $price,
+            'image'         => $p->image ?? $p->thumbnail_url ?? null,
+            'category_name' => optional($p->category)->name,
+            'brand_name'    => optional($p->brand)->name,
+            'is_liked'      => true,
+        ];
+
+        return response()->json([
+            'message' => 'Added',
+            'liked'   => true,
+            'item'    => $item,
+        ]);
     }
 
     // DELETE /api/wishlist/{product}
     public function destroy(Request $request, Product $product)
     {
         $user = $request->user();
-        Wishlist::where('user_id', $user->id)->where('product_id', $product->id)->delete();
-        return response()->json(['message' => 'Removed']);
+        Wishlist::where('user_id', $user->id)
+            ->where('product_id', $product->id)
+            ->delete();
+
+        return response()->json([
+            'message'    => 'Removed',
+            'product_id' => $product->id,
+        ]);
     }
 
     // (tuỳ chọn) GET /api/wishlist/count
