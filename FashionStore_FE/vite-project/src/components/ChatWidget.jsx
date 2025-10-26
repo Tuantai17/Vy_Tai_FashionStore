@@ -121,6 +121,14 @@ export default function ChatWidget({
           copy[copy.length - 1] = { role: "assistant", content: text2 };
           return copy;
         });
+        // Nếu backend trả về danh sách products, thêm message tóm tắt để FE hiển thị
+        if (json && Array.isArray(json.products) && json.products.length) {
+          const prodText = json.products
+            .slice(0, 6)
+            .map((p) => `- ${p.name} — ${new Intl.NumberFormat('vi-VN').format(p.price)}đ`)
+            .join('\n');
+          setMessages((m) => [...m, { role: 'assistant', content: `Gợi ý sản phẩm:\n${prodText}` }]);
+        }
       } catch {
         setMessages((m) => {
           const copy = [...m];

@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Services\ChatbotGroundingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ChatbotGeminiController extends Controller
 {
@@ -47,21 +48,30 @@ SYS;
 
         $lastUser = $this->lastUserUtterance($messages);
 
-        return [
-            // Grounding + hướng dẫn
-            [
+        $contents = [];
+
+        // Nếu có grounding thì nhét làm nguồn sự thật; nếu không, bỏ qua (tránh trả về chỉ header)
+        if (trim($grounding) !== '') {
+            $contents[] = [
                 'parts' => [[
                     'text' =>
                     "Hãy dùng dữ liệu dưới đây làm nguồn sự thật chính. Nếu dữ liệu thiếu, hãy nói 'mình chưa chắc' và đề nghị thông tin bổ sung.\n\n"
                         . $grounding
                         . $intentLine
                 ]]
-            ],
-            // Câu hỏi người dùng (cuối)
-            [
-                'parts' => [['text' => $lastUser]]
-            ],
-        ];
+            ];
+        } else {
+            // Khi không có grounding, nhắc model ưu tiên trung thực và dùng kiến thức chung
+            $hint = "(Không tìm thấy dữ liệu nội bộ liên quan.) Hãy trả lời chính xác, ngắn gọn và nếu không chắc hãy hỏi thêm thông tin.";
+            $contents[] = [
+                'parts' => [['text' => $hint . ($intentLine ? "\n\n" . $intentLine : "")]]
+            ];
+        }
+
+        // luôn gửi only last user utterance để tránh lỗi role
+        $contents[] = ['parts' => [['text' => $lastUser]]];
+
+        return $contents;
     }
 
     /* ===================== NON-STREAM ===================== */
@@ -71,7 +81,7 @@ SYS;
 
         $apiKey = trim((string) env('GEMINI_API_KEY', ''));
         if ($apiKey === '') {
-            \Log::error('Gemini: missing GEMINI_API_KEY');
+            Log::error('Gemini: missing GEMINI_API_KEY');
             return response()->json(['error' => 'Server misconfigured: missing GEMINI_API_KEY'], 500);
         }
 
@@ -83,12 +93,14 @@ SYS;
         $lastUser = $this->lastUserUtterance($data['messages']);
         $signals  = $this->grounding->extractIntent($lastUser);
         $cacheKey = 'grounding:' . md5($lastUser);
-        $context  = cache()->remember($cacheKey, now()->addMinutes(10), function () use ($lastUser) {
-            return $this->grounding->buildContext($lastUser);
+        $context  = cache()->remember($cacheKey, now()->addMinutes(10), function () use ($lastUser, $signals) {
+            return $this->grounding->buildContext($lastUser, $signals['budget'] ?? null);
         });
 
-        // Build generation config dynamically. Some provider setups reject certain responseMimeType values,
-        // so only include it when explicitly configured via GEMINI_RESPONSE_MIME.
+        // Tìm sản phẩm phù hợp theo tín hiệu ngân sách/keywords (dùng cả để trả về cho FE)
+        $products = $this->grounding->searchProducts($lastUser, $signals['budget_min'] ?? null, $signals['budget_max'] ?? null, 6);
+
+        // Build generation config
         $genConfig = [
             'temperature'     => (float) env('GEMINI_TEMPERATURE', 0.5),
             'maxOutputTokens' => (int)   env('GEMINI_MAX_TOKENS', 896),
@@ -98,10 +110,11 @@ SYS;
             $genConfig['responseMimeType'] = $mime;
         }
 
+        // Rút gọn grounding để tránh vượt token
+        $shortContext = $this->shortenText($context, 900);
         $payload = [
             'systemInstruction' => ['parts' => [['text' => $this->systemPrompt()]]],
-            // contents tối giản, KHÔNG gửi role
-            'contents'          => $this->buildContents($data['messages'], $context, $signals),
+            'contents'          => $this->buildContents($data['messages'], $shortContext, $signals),
             'generationConfig'  => $genConfig,
         ];
 
@@ -115,20 +128,17 @@ SYS;
 
             if (!$res->ok()) {
                 $body = $res->json() ?: $res->body();
-                \Log::warning('Gemini error (non-stream)', [
+                Log::warning('Gemini error (non-stream)', [
                     'status' => $res->status(),
                     'body'   => $body,
                     'url'    => $url,
                 ]);
 
-                // If provider indicates model not found (common misconfig), return a clear message
                 if ($res->status() === 404) {
                     $msg = 'Gemini model not found. Check GEMINI_MODEL and GEMINI_BASE in your .env';
-                    // Suggest fallback model if configured
                     $fallback = trim((string) env('GEMINI_FALLBACK_MODEL', ''));
                     if ($fallback !== '' && $fallback !== $model) {
-                        // try a single retry with fallback model
-                        \Log::info('Attempting fallback Gemini model', ['from' => $model, 'to' => $fallback]);
+                        Log::info('Attempting fallback Gemini model', ['from' => $model, 'to' => $fallback]);
                         $url2 = "{$base}/models/{$fallback}:generateContent?key={$apiKey}";
                         $res2 = Http::timeout(25)->retry(1, 300)->asJson()->acceptJson()->post($url2, $payload);
                         if ($res2->ok()) {
@@ -139,31 +149,34 @@ SYS;
                                     if (!empty($p['text'])) $reply .= $p['text'];
                                 }
                             }
-                            $reply = trim($reply) ?: "Mình chưa chắc thông tin này. Bạn mô tả rõ hơn giúp mình nhé?";
-                            return response()->json(['reply' => $reply, 'signals' => $signals]);
+                            $reply = $this->sanitizeReply(trim($reply) ?: "Mình chưa chắc thông tin này. Bạn mô tả rõ hơn giúp mình nhé?");
+                            $resp = ['reply' => $reply, 'signals' => $signals];
+                            if (!empty($products)) $resp['products'] = $products;
+                            return response()->json($resp);
                         }
-                        \Log::warning('Fallback model also failed', ['status' => $res2->status(), 'body' => $res2->body()]);
+                        Log::warning('Fallback model also failed', ['status' => $res2->status(), 'body' => $res2->body()]);
                         $msg .= ". Fallback model also failed. See logs.";
                     }
 
-                    // If local fallback is enabled, return a simulated reply instead of 502
                     if ($fallbackEnabled) {
-                        $reply = $this->localFallbackReply($lastUser, $context, $signals);
-                        return response()->json(['reply' => $reply, 'signals' => $signals]);
+                        $reply = $this->localFallbackReply($context, $signals, $products);
+                        $resp = ['reply' => $this->sanitizeReply($reply), 'signals' => $signals];
+                        if (!empty($products)) $resp['products'] = $products;
+                        return response()->json($resp);
                     }
 
                     return response()->json([
-                        'error'  => 'provider_model_not_found',
-                        'detail' => $msg,
+                        'error'    => 'provider_model_not_found',
+                        'detail'   => $msg,
                         'provider' => $body,
                     ], 502);
                 }
 
-                // Default: return provider body and status mapped to 502 for frontend clarity
-                // If configured, synthesize a safe local reply for dev so the frontend still works.
                 if ($fallbackEnabled) {
-                    $reply = $this->localFallbackReply($lastUser, $context, $signals);
-                    return response()->json(['reply' => $reply, 'signals' => $signals]);
+                    $reply = $this->localFallbackReply($context, $signals, $products);
+                    $resp = ['reply' => $this->sanitizeReply($reply), 'signals' => $signals];
+                    if (!empty($products)) $resp['products'] = $products;
+                    return response()->json($resp);
                 }
 
                 return response()->json([
@@ -180,19 +193,19 @@ SYS;
                     if (!empty($p['text'])) $reply .= $p['text'];
                 }
             }
-            $reply = trim($reply) ?: "Mình chưa chắc thông tin này. Bạn mô tả rõ hơn giúp mình nhé?";
 
-            return response()->json([
-                'reply'   => $reply,
-                'signals' => $signals,
-            ]);
+            $reply = $this->sanitizeReply(trim($reply) ?: "Mình chưa chắc thông tin này. Bạn mô tả rõ hơn giúp mình nhé?");
+            $resp = ['reply' => $reply, 'signals' => $signals];
+            if (!empty($products)) $resp['products'] = $products;
+            return response()->json($resp);
         } catch (\Throwable $e) {
-            \Log::error('Gemini exception (non-stream)', ['message' => $e->getMessage(), 'url' => $url]);
+            Log::error('Gemini exception (non-stream)', ['message' => $e->getMessage(), 'url' => $url]);
             if ($fallbackEnabled) {
-                $reply = $this->localFallbackReply($lastUser, $context, $signals);
-                return response()->json(['reply' => $reply, 'signals' => $signals]);
+                $reply = $this->localFallbackReply($context, $signals, $products);
+                $resp = ['reply' => $this->sanitizeReply($reply), 'signals' => $signals];
+                if (!empty($products)) $resp['products'] = $products;
+                return response()->json($resp);
             }
-
             return response()->json([
                 'error'  => 'Upstream error',
                 'detail' => $e->getMessage(),
@@ -212,18 +225,19 @@ SYS;
 
         $model = trim((string) env('GEMINI_MODEL', 'gemini-1.5-flash-latest'));
         $base  = rtrim(env('GEMINI_BASE', 'https://generativelanguage.googleapis.com/v1beta'), '/');
-        // dùng đúng endpoint stream
         $url   = "{$base}/models/{$model}:streamGenerateContent?key={$apiKey}";
 
         // Grounding + cache
         $lastUser = $this->lastUserUtterance($data['messages']);
         $signals  = $this->grounding->extractIntent($lastUser);
         $cacheKey = 'grounding:' . md5($lastUser);
-        $context  = cache()->remember($cacheKey, now()->addMinutes(10), function () use ($lastUser) {
-            return $this->grounding->buildContext($lastUser);
+        $context  = cache()->remember($cacheKey, now()->addMinutes(10), function () use ($lastUser, $signals) {
+            return $this->grounding->buildContext($lastUser, $signals['budget'] ?? null);
         });
 
-        // See note above: only include responseMimeType if explicitly configured to avoid 400s.
+        // Search products for this query (min/max budget from signals)
+        $products = $this->grounding->searchProducts($lastUser, $signals['budget_min'] ?? null, $signals['budget_max'] ?? null, 6);
+
         $genConfig = [
             'temperature'     => (float) env('GEMINI_TEMPERATURE', 0.5),
             'maxOutputTokens' => (int)   env('GEMINI_MAX_TOKENS', 896),
@@ -233,9 +247,11 @@ SYS;
             $genConfig['responseMimeType'] = $mime;
         }
 
+        // Có thể rút gọn context để stream gọn hơn
+        $shortContext = $this->shortenText($context, 1100);
         $payload  = [
             'systemInstruction' => ['parts' => [['text' => $this->systemPrompt()]]],
-            'contents'          => $this->buildContents($data['messages'], $context, $signals),
+            'contents'          => $this->buildContents($data['messages'], $shortContext, $signals),
             'generationConfig'  => $genConfig,
         ];
 
@@ -245,14 +261,18 @@ SYS;
         @ini_set('zlib.output_compression', '0');
         @ini_set('implicit_flush', '1');
 
-        return response()->stream(function () use ($url, $payload) {
+        $lastUserLocal = $lastUser;  // bring to closure
+        $signalsLocal  = $signals;
+        $contextLocal  = $context;
+        $productsLocal = $products;
+
+        return response()->stream(function () use ($url, $payload, $fallbackEnabled, $lastUserLocal, $signalsLocal, $contextLocal, $productsLocal) {
             $ch = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_POST           => true,
                 CURLOPT_HTTPHEADER     => ['Accept: application/json', 'Content-Type: application/json'],
                 CURLOPT_POSTFIELDS     => json_encode($payload),
                 CURLOPT_WRITEFUNCTION  => function ($ch, $data) {
-                    // Google stream trả từng dòng JSON; bóc text và đẩy dưới dạng SSE
                     foreach (preg_split("/\r\n|\n|\r/", $data) as $line) {
                         $line = trim($line);
                         if ($line === '') continue;
@@ -275,12 +295,11 @@ SYS;
             $ok = curl_exec($ch);
             if ($ok === false) {
                 $err = curl_error($ch);
-                \Log::error('Gemini stream curl error', ['error' => $err]);
+                Log::error('Gemini stream curl error', ['error' => $err]);
 
                 if ($fallbackEnabled) {
-                    // Emit a short simulated SSE reply so the frontend can handle it like real stream.
-                    $sim = $this->localFallbackReply($lastUser ?? '', $context ?? '', $signals ?? []);
-                    // Break into one data event
+                    $sim = $this->localFallbackReply($contextLocal, $signalsLocal, $productsLocal);
+                    $sim = $this->sanitizeReply($sim);
                     echo "data: " . str_replace(["\r", "\n"], ['\\r', '\\n'], $sim) . "\n\n";
                 } else {
                     echo "data: (stream error)\n\n";
@@ -310,40 +329,69 @@ SYS;
     }
 
     /**
-     * Build a small deterministic fallback reply used when external Gemini is unavailable.
-     * This is intentionally conservative and suitable for development/testing only.
+     * Fallback khi không gọi được Gemini: TRẢ VỀ NGẮN GỌN, KHÔNG NHÃN DEBUG.
+     * Mặc định: chỉ trả về phần context đã rút gọn để widget hiển thị sạch.
+     * Nếu cần debug nội bộ, set GEMINI_DEV_VERBOSE=true để in thêm thông tin.
      */
-    private function localFallbackReply(string $lastUser, string $context, array $signals): string
+    private function localFallbackReply(string $context, array $signals = [], array $products = []): string
     {
-        $out = "[Mô phỏng trả lời - chế độ dev]\n";
-        $out .= "Câu hỏi: " . trim($lastUser) . "\n";
+        $verbose = filter_var(env('GEMINI_DEV_VERBOSE', false), FILTER_VALIDATE_BOOLEAN);
+        $summary = $this->shortenText($context, 600);
 
-        if (!empty($signals['budget'])) {
-            $out .= "Ngân sách: " . number_format($signals['budget'], 0, ',', '.') . "đ\n";
+        if ($verbose) {
+            return "⧉ DEBUG(dev)\n" . $summary;
         }
-        if (!empty($signals['keywords'])) {
-            $out .= "Từ khóa: " . implode(', ', array_slice($signals['keywords'], 0, 6)) . "\n";
+        // Nếu có tín hiệu greeting, trả lời thân thiện thay vì trả raw context
+        if (!empty($signals['greeting'])) {
+            return "Xin chào! Mình là trợ lý FashionStore — mình có thể giúp bạn tìm sản phẩm, gợi ý size, hoặc tư vấn theo ngân sách. Bạn muốn xem gì hôm nay?";
         }
 
-        // provide a safe, short suggestion based on the budget keyword
-        if (!empty($signals['budget'])) {
-            $b = (int) $signals['budget'];
-            if ($b < 500000) {
-                $out .= "Gợi ý: bạn có thể xem các sản phẩm giá rẻ, ví dụ áo phông hoặc phụ kiện.\n";
-            } elseif ($b < 2000000) {
-                $out .= "Gợi ý: các áo khoác nhẹ, váy or quần tây trong tầm giá này thường phù hợp.\n";
-            } else {
-                $out .= "Gợi ý: bạn có nhiều lựa chọn; cân nhắc chất liệu và thương hiệu.\n";
+        // Nếu không có context hữu dụng thì trả fallback hữu ích
+        if (trim($summary) === '') {
+            // Nếu có sản phẩm tìm được, liệt kê ngắn
+            if (!empty($products)) {
+                $lines = ["Mình tạm thời không truy vấn được dịch vụ AI chính. Dưới đây là một vài gợi ý phù hợp:"];
+                foreach (array_slice($products, 0, 6) as $p) {
+                    $lines[] = "- {$p['name']} — " . number_format($p['price'], 0, ',', '.') . "đ";
+                }
+                return implode("\n", $lines);
             }
-        } else {
-            $out .= "Gợi ý: bạn có thể mô tả thêm (màu, loại, ngân sách) để mình tư vấn chính xác hơn.\n";
+
+            return "Mình tạm thời không truy vấn được dịch vụ AI chính. Bạn có thể hỏi về sản phẩm, ngân sách, hoặc mô tả sản phẩm bạn cần — mình sẽ cố gắng giúp.";
         }
 
-        $out .= "(Dữ liệu thực tế tóm tắt)\n";
-        $summary = trim(substr($context, 0, 400));
-        if ($summary !== '') $out .= $summary . (strlen($context) > 400 ? '...' : '') . "\n";
+        // Nếu có sản phẩm liên quan, thêm gợi ý ngắn xuống cuối summary
+        if (!empty($products)) {
+            $lines = [$summary, "\nGợi ý sản phẩm:"];
+            foreach (array_slice($products, 0, 4) as $p) {
+                $lines[] = "- {$p['name']} — " . number_format($p['price'], 0, ',', '.') . "đ";
+            }
+            return implode("\n", $lines);
+        }
 
-        $out .= "\nNếu bạn muốn dùng Gemini thật, kiểm tra GEMINI_MODEL/GEMINI_BASE trong .env";
-        return $out;
+        // Chế độ bình thường: trả về tóm tắt dữ liệu nội bộ
+        return $summary;
+    }
+
+    /** Sanitize provider reply */
+    private function sanitizeReply(string $text): string
+    {
+        $decoded = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $stripped = strip_tags($decoded);
+        $norm = preg_replace('/[\r\n\t]+/', "\n", $stripped);
+        $norm = preg_replace('/[ \t]{2,}/', ' ', $norm);
+        return trim($norm);
+    }
+
+    /** Rút gọn text giữ nguyên từ hoàn chỉnh */
+    private function shortenText(string $text, int $maxChars = 800): string
+    {
+        $plain = trim(strip_tags(html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+        if (mb_strlen($plain) <= $maxChars) return $plain;
+        $cut = mb_substr($plain, 0, $maxChars);
+        $last = mb_strrpos($cut, ".");
+        if ($last === false) $last = mb_strrpos($cut, ' ');
+        if ($last !== false) $cut = mb_substr($cut, 0, $last);
+        return trim($cut) . '...';
     }
 }
