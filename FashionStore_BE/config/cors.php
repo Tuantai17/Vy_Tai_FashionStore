@@ -1,36 +1,55 @@
 <?php
 
-// Helper: parse danh sách origins từ ENV (phân tách bởi dấu phẩy)
-$envOrigins = array_filter(array_map('trim', explode(',', env('APP_FRONTEND_ORIGINS', ''))));
+/**
+ * Chuẩn hoá string URL -> ORIGIN (scheme://host[:port])
+ * Trả về null nếu không hợp lệ.
+ */
+$toOrigin = function (?string $url) {
+    if (!$url) return null;
+    $url = trim($url);
+    $parts = @parse_url($url);
+    if (!$parts || empty($parts['scheme']) || empty($parts['host'])) {
+        return null;
+    }
+    $origin = $parts['scheme'] . '://' . $parts['host'];
+    if (!empty($parts['port'])) {
+        $origin .= ':' . $parts['port'];
+    }
+    return rtrim($origin, '/');
+};
+
+// Lấy danh sách origins từ ENV
+$single = $toOrigin(env('APP_FRONTEND_ORIGIN'));
+$frontUrl = $toOrigin(env('FRONTEND_URL'));  // nếu bạn dùng
+$multi = array_filter(array_map($toOrigin, array_map('trim', explode(',', env('APP_FRONTEND_ORIGINS', '')))));
+
+$origins = array_values(array_filter(array_unique(array_merge(
+    $single ? [$single] : [],
+    $multi,
+    $frontUrl ? [$frontUrl] : [],
+))));
 
 return [
 
-    // Áp dụng cho API (và Sanctum nếu dùng cookie)
+    // Áp dụng CORS cho API (và Sanctum nếu cần)
     'paths' => ['api/*', 'sanctum/csrf-cookie'],
 
     // Cho phép mọi method (bao gồm OPTIONS cho preflight)
     'allowed_methods' => ['*'],
 
-    // Danh sách origin cụ thể (không đưa domain BE vào đây)
-    // - APP_FRONTEND_ORIGIN: 1 origin chính (ví dụ localhost)
-    // - APP_FRONTEND_ORIGINS: nhiều origin, ngăn cách bởi dấu phẩy (VD: vercel, staging…)
-    'allowed_origins' => array_values(array_filter([
-        env('APP_FRONTEND_ORIGIN', null), // ví dụ: http://localhost:5173
-        ...$envOrigins,                   // ví dụ: https://yourapp.vercel.app, https://staging.example.com
-    ])),
+    // Danh sách ORIGINS hợp lệ (CHỈ origin, không kèm path)
+    'allowed_origins' => $origins,
 
-    // Regex cho các domain động (subdomain)
-    // - Vercel: https://*.vercel.app
-    // - Ngrok:  https://*.ngrok-free.app (tuỳ bạn có dùng hay không)
+    // Cho phép wildcard cho subdomain động (Vercel/Ngrok)
     'allowed_origins_patterns' => [
-        '#^https://[a-z0-9-]+\.vercel\.app$#i',
-        '#^https://[a-z0-9-]+\.ngrok-free\.app$#i',
+        '#^https?://[a-z0-9-]+\.vercel\.app$#i',
+        '#^https?://[a-z0-9-]+\.ngrok-free\.app$#i',
     ],
 
-    // Header được phép gửi lên
+    // Cho phép mọi header
     'allowed_headers' => ['*'],
 
-    // Header response mà FE có thể đọc (hữu ích khi debug SSE/Cache)
+    // Header FE có thể đọc (tiện debug SSE/Cache)
     'exposed_headers' => [
         'Content-Type',
         'Cache-Control',
@@ -40,7 +59,6 @@ return [
 
     'max_age' => 0,
 
-    // Dùng Bearer token (không cookie) -> để false.
-    // Nếu chuyển qua cookie/Sanctum SPA: chỉnh true và set SANCTUM_STATEFUL_DOMAINS + SESSION_DOMAIN.
+    // Dùng Bearer token → KHÔNG dùng cookie
     'supports_credentials' => false,
 ];

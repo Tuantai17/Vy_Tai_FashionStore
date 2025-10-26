@@ -32,6 +32,21 @@ use App\Http\Controllers\Api\{
 };
 // import products from CSV
 
+
+
+
+use App\Http\Controllers\Api\ChatbotGeminiController;
+
+Route::post('/chat-gemini', [ChatbotGeminiController::class, 'chat']);
+Route::post('/chat-gemini/stream', [ChatbotGeminiController::class, 'chatStream']);
+
+
+
+
+
+
+// ===== Admin Dashboard =====
+
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::post('/products/import', [ProductImportController::class, 'import']);
     Route::get('/products/export', [ProductImportController::class, 'export']);

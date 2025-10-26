@@ -40,6 +40,8 @@ import VoucherWarehouse from "./pages/Customers/VoucherWarehouse";
 
 import CanceledOrders from "./pages/Customers/CanceledOrders.jsx";
 
+import ChatbotGemini from "./pages/ChatbotGemini";
+
 
 
 // ===== Admin pages/layout =====
@@ -558,6 +560,9 @@ function App() {
         <Route path="/wishlist" element={<Layout><Wishlist /></Layout>} />\r\n        <Route path="/vouchers" element={<Layout><VoucherWarehouse /></Layout>} />\r\n\r\n
 
           <Route path="/canceled-orders" element={<Layout><CanceledOrders /></Layout>} />
+
+
+            <Route path="/chatbot" element={<ChatbotGemini />} />
 
 
         {/* Admin */}
