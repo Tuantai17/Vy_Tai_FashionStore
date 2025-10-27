@@ -44,7 +44,7 @@ return [
         'org'      => env('OPENAI_ORG'), // ✅ THÊM DÒNG NÀY
     ],
 
-
+    'gemini' => ['key' => env('GEMINI_API_KEY')],
 
     // 'momo' => [
     //     'endpoint'      => env('MOMO_ENDPOINT'),

@@ -33,6 +33,9 @@ use App\Http\Controllers\Api\{
 // import products from CSV
 
 
+use App\Http\Controllers\Api\NewsController;
+use App\Http\Controllers\Api\AiController;
+
 
 
 use App\Http\Controllers\Api\ChatbotGeminiController;
@@ -42,6 +45,18 @@ Route::post('/chat-gemini/stream', [ChatbotGeminiController::class, 'chatStream'
 
 
 
+
+//n8n tin tuc
+// Public
+Route::get('/news', [NewsController::class, 'index']);
+Route::get('/news/{slug}', [NewsController::class, 'show']);
+
+// Bảo vệ bằng Sanctum khi n8n gọi
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/news', [NewsController::class, 'store']);
+    Route::put('/news/{id}', [NewsController::class, 'update']);
+    Route::post('/ai/summarize', [AiController::class, 'summarize']);
+});
 
 
 
