@@ -33,6 +33,8 @@ export default function ChatWidget({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [badge, setBadge] = useState(1); // chấm đỏ trên nút
+  const [products, setProducts] = useState([]);
+  const [signals, setSignals] = useState({});
 
   const bottomRef = useRef(null);
   useEffect(() => {
@@ -53,10 +55,25 @@ export default function ChatWidget({
     } catch {}
   }, [messages]);
 
+  // ---- XÓA LỊCH SỬ (reset) ----
+  function clearChatHistory() {
+    if (!confirm("Bạn chắc chắn muốn xóa toàn bộ lịch sử cuộc trò chuyện này?")) return;
+
+    const hello = { role: "assistant", content: "Xin chào 👋 Mình là trợ lý AI. Bạn cần tư vấn gì ạ?" };
+    setMessages([hello]);
+    setProducts([]);
+    setSignals({});
+    setInput("");
+
+    try {
+      localStorage.removeItem("fs_chat_history");
+    } catch {}
+  }
+
   // ---- send message with stream + fallback ----
-  async function sendMessage(e) {
+  async function sendMessage(e, overrideText) {
     e?.preventDefault?.();
-    const text = input.trim();
+    const text = (typeof overrideText === 'string' ? overrideText : input).trim();
     if (!text || loading) return;
 
     setBadge(0); // đã mở chat
@@ -81,6 +98,7 @@ export default function ChatWidget({
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
 
+      // read stream (handled in robust JSON-aware loop below)
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -89,14 +107,58 @@ export default function ChatWidget({
         // SSE: từng dòng "data: ..."
         chunk.split("\n").forEach((line) => {
           if (!line.startsWith("data: ")) return;
-          const payload = line.slice(6);
-          if (payload === "[DONE]") return;
-          acc += payload;
-          setMessages((m) => {
-            const copy = [...m];
-            copy[copy.length - 1] = { role: "assistant", content: acc };
-            return copy;
-          });
+          const payload = line.slice(6).trim();
+          if (!payload || payload === "[DONE]") return;
+
+          // Try parse JSON. The backend may send partial JSON increments
+          let obj = null;
+          try {
+            obj = JSON.parse(payload);
+          } catch (e) {
+            // not JSON: treat as plain text chunk
+          }
+
+          if (obj) {
+            // meta message (signals/products)
+            if (obj.type === 'meta') {
+              if (Array.isArray(obj.products)) setProducts(obj.products);
+              if (obj.signals) setSignals(obj.signals);
+              return;
+            }
+
+            // Some providers send { delta: 'text' } or { text: '...' } or nested content
+            let piece = '';
+            if (typeof obj.delta === 'string') piece = obj.delta;
+            else if (typeof obj.text === 'string') piece = obj.text;
+            else if (obj.candidate && obj.candidate.content && Array.isArray(obj.candidate.content.parts)) {
+              // try extract text from candidate parts
+              piece = obj.candidate.content.parts.map(p => p.text || '').join('');
+            } else if (typeof obj.content === 'string') {
+              piece = obj.content;
+            }
+
+            if (piece) {
+              acc += piece;
+              setMessages((m) => {
+                const copy = [...m];
+                copy[copy.length - 1] = { role: 'assistant', content: acc };
+                return copy;
+              });
+              return;
+            }
+
+            // fallback: if JSON has products/signals fields
+            if (Array.isArray(obj.products)) setProducts(obj.products);
+            if (obj.signals) setSignals(obj.signals);
+          } else {
+            // plain text payload
+            acc += payload;
+            setMessages((m) => {
+              const copy = [...m];
+              copy[copy.length - 1] = { role: "assistant", content: acc };
+              return copy;
+            });
+          }
         });
       }
 
@@ -123,11 +185,10 @@ export default function ChatWidget({
         });
         // Nếu backend trả về danh sách products, thêm message tóm tắt để FE hiển thị
         if (json && Array.isArray(json.products) && json.products.length) {
-          const prodText = json.products
-            .slice(0, 6)
-            .map((p) => `- ${p.name} — ${new Intl.NumberFormat('vi-VN').format(p.price)}đ`)
-            .join('\n');
-          setMessages((m) => [...m, { role: 'assistant', content: `Gợi ý sản phẩm:\n${prodText}` }]);
+          setProducts(json.products);
+        }
+        if (json && json.signals) {
+          setSignals(json.signals);
         }
       } catch {
         setMessages((m) => {
@@ -234,6 +295,19 @@ export default function ChatWidget({
       >
         <div style={{ fontWeight: 700 }}>🧠 {title}</div>
         <div style={{ display: "flex", gap: 6 }}>
+          <button
+            onClick={clearChatHistory}
+            disabled={loading}
+            title="Xóa lịch sử"
+            style={{
+              ...iconBtn,
+              background: "rgba(239,68,68,.25)",
+              opacity: loading ? 0.6 : 1,
+              cursor: loading ? "not-allowed" : "pointer",
+            }}
+          >
+            🗑
+          </button>
           <button onClick={() => window.open("/chatbot", "_self")} title="Mở toàn trang" style={iconBtn}>
             ⛶
           </button>
@@ -278,6 +352,38 @@ export default function ChatWidget({
             </div>
           </div>
         ))}
+        {/* Products area (from backend signals/products) */}
+        {products && products.length > 0 && (
+          <div style={{ marginTop: 8, padding: 8, background: '#fff', borderRadius: 10, border: '1px solid #eee' }}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Gợi ý sản phẩm</div>
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6 }}>
+              {products.slice(0, 6).map((p, idx) => (
+                <div key={idx} style={{ minWidth: 160, border: '1px solid #f0f0f0', borderRadius: 8, padding: 8, background: '#fff' }}>
+                  <div style={{ height: 90, background: '#f8f8f8', borderRadius: 6, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                    {p.thumbnail ? <img src={p.thumbnail} alt={p.name} style={{ maxWidth: '100%', maxHeight: '100%' }} /> : <div style={{ fontSize: 12, color: '#999' }}>No image</div>}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</div>
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{new Intl.NumberFormat('vi-VN').format(p.price)}đ</div>
+                  <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
+                    <button onClick={() => window.open(`/products/${p.id}`, '_self')} style={{ flex: 1, padding: '6px 8px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', cursor: 'pointer' }}>Xem</button>
+                    <button onClick={() => sendMessage(null, `Cho tôi xem chi tiết ${p.name} (id: ${p.id})`)} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #eee', background: '#fff', cursor: 'pointer' }}>Hỏi</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Quick suggestion chips based on signals */}
+            <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {(signals?.keywords || []).slice(0, 4).map((kw, i) => (
+                <button key={i} onClick={() => sendMessage(null, `Cho tôi xem sản phẩm trong danh mục: ${kw}`)} style={{ padding: '6px 10px', borderRadius: 20, border: '1px solid #eee', background: '#f3f4f6', cursor: 'pointer', fontSize: 12 }}>{kw}</button>
+              ))}
+              {signals && signals.budget && (
+                <button onClick={() => sendMessage(null, `Cho tôi xem sản phẩm trong mức giá ${new Intl.NumberFormat('vi-VN').format(signals.budget)}đ`)} style={{ padding: '6px 10px', borderRadius: 20, border: '1px solid #eee', background: '#fef3c7', cursor: 'pointer', fontSize: 12 }}>Ngân sách: {new Intl.NumberFormat('vi-VN').format(signals.budget)}đ</button>
+              )}
+            </div>
+          </div>
+        )}
+
         {loading && <div style={{ fontSize: 12, opacity: 0.6 }}>Đang soạn trả lời…</div>}
         <div ref={bottomRef} />
       </div>

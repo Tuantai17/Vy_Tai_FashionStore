@@ -12,37 +12,70 @@ class ChatbotGroundingService
     public function buildContext(
         string $userMessage,
         ?int $budget = null,
+        array $signals = [],
         int $limitProducts = 5,
         int $limitArticles = 2,
         int $limitReviews = 2
     ): string {
-        // ---- SẢN PHẨM LIÊN QUAN (lọc theo từ khóa + khoảng ngân sách ±20%) ----
+        $terms = $this->buildSearchTerms($userMessage, $signals['keywords'] ?? []);
+        $minBudget = $signals['budget_min'] ?? null;
+        $maxBudget = $signals['budget_max'] ?? null;
+
+        if ($minBudget === null && $maxBudget === null && $budget !== null) {
+            $minBudget = (int) max(0, round($budget * 0.8));
+            $maxBudget = (int) round($budget * 1.2);
+        }
+
         $products = Product::query()
-            ->when($budget, function ($q) use ($budget) {
-                $low  = max(0, (int) round($budget * 0.8));
-                $high = (int) round($budget * 1.2);
-                $q->whereBetween('price_sale', [$low, $high]);
+            ->when($minBudget !== null && $maxBudget !== null, function ($q) use ($minBudget, $maxBudget) {
+                $q->whereBetween('price_sale', [$minBudget, $maxBudget]);
             })
-            ->where(function ($q) use ($userMessage) {
-                $q->where('name', 'LIKE', "%{$userMessage}%")
-                    ->orWhere('description', 'LIKE', "%{$userMessage}%");
+            ->when($minBudget !== null && $maxBudget === null, function ($q) use ($minBudget) {
+                $q->where('price_sale', '>=', $minBudget);
+            })
+            ->when($maxBudget !== null && $minBudget === null, function ($q) use ($maxBudget) {
+                $q->where('price_sale', '<=', $maxBudget);
+            })
+            ->when(!empty($terms), function ($q) use ($terms) {
+                $q->where(function ($sub) use ($terms) {
+                    foreach ($terms as $term) {
+                        $like = $this->likeTerm($term);
+                        $sub->orWhere('name', 'LIKE', $like)
+                            ->orWhere('description', 'LIKE', $like);
+                    }
+                });
             })
             ->orderBy('price_sale')
             ->limit($limitProducts)
             ->get(['id', 'name', 'price_sale', 'description']);
 
+        if ($products->isEmpty() && trim($userMessage) !== '') {
+            $fallbackTerm = $this->likeTerm($userMessage);
+            $products = Product::query()
+                ->where(function ($q) use ($fallbackTerm) {
+                    $q->where('name', 'LIKE', $fallbackTerm)
+                        ->orWhere('description', 'LIKE', $fallbackTerm);
+                })
+                ->orderBy('price_sale')
+                ->limit($limitProducts)
+                ->get(['id', 'name', 'price_sale', 'description']);
+        }
+
         $relatedProducts = $products->map(function ($p) {
             $price = $this->formatVnd($p->price_sale);
             $desc  = $this->ellipsis((string) $p->description, 90);
-            // ❌ KHÔNG ghép URL
-            return "- {$p->name} | {$price}" . ($desc ? "\n  Mô tả: {$desc}" : "");
+            return "- {$p->name} | {$price}" . ($desc ? "\n  Mo ta: {$desc}" : '');
         })->implode("\n");
 
-        // ---- BÀI VIẾT / TIN TỨC LIÊN QUAN (không URL) ----
         $articles = Article::query()
-            ->where(function ($q) use ($userMessage) {
-                $q->where('title', 'LIKE', "%{$userMessage}%")
-                    ->orWhere('summary', 'LIKE', "%{$userMessage}%");
+            ->when(!empty($terms), function ($q) use ($terms) {
+                $q->where(function ($sub) use ($terms) {
+                    foreach ($terms as $term) {
+                        $like = $this->likeTerm($term);
+                        $sub->orWhere('title', 'LIKE', $like)
+                            ->orWhere('summary', 'LIKE', $like);
+                    }
+                });
             })
             ->orderByDesc('id')
             ->limit($limitArticles)
@@ -50,12 +83,18 @@ class ChatbotGroundingService
 
         $relatedArticles = $articles->map(function ($a) {
             $sum = $this->ellipsis((string) $a->summary, 120);
-            return "- {$a->title}" . ($sum ? "\n  Tóm tắt: {$sum}" : "");
+            return "- {$a->title}" . ($sum ? "\n  Tom tat: {$sum}" : '');
         })->implode("\n");
 
-        // ---- ĐÁNH GIÁ LIÊN QUAN ----
         $reviews = Review::query()
-            ->where('comment', 'LIKE', "%{$userMessage}%")
+            ->when(!empty($terms), function ($q) use ($terms) {
+                $q->where(function ($sub) use ($terms) {
+                    foreach ($terms as $term) {
+                        $like = $this->likeTerm($term);
+                        $sub->orWhere('comment', 'LIKE', $like);
+                    }
+                });
+            })
             ->orderByDesc('id')
             ->limit($limitReviews)
             ->get(['rating', 'comment']);
@@ -65,24 +104,22 @@ class ChatbotGroundingService
             return "- ({$r->rating}/5) {$cmt}";
         })->implode("\n");
 
-        // ---- GHÉP CONTEXT ----
-        // Nếu không tìm thấy mục nào liên quan thì trả về chuỗi rỗng
         if ($relatedProducts === '' && $relatedArticles === '' && $relatedReviews === '') {
             return '';
         }
 
         $lines = [];
-        $lines[] = "DỮ LIỆU THẬT (đã rút gọn) — ƯU TIÊN TRÍCH Ở ĐÂY TRƯỚC:";
+        $lines[] = 'Du lieu noi bo vua tim thay, dung de tu van chinh xac:';
         if ($relatedProducts !== '') {
-            $lines[] = "[Sản phẩm liên quan]";
+            $lines[] = '[San pham lien quan]';
             $lines[] = $relatedProducts;
         }
         if ($relatedArticles !== '') {
-            $lines[] = "[Bài viết / tin tức liên quan]";
+            $lines[] = '[Bai viet / tin tuc lien quan]';
             $lines[] = $relatedArticles;
         }
         if ($relatedReviews !== '') {
-            $lines[] = "[Đánh giá liên quan]";
+            $lines[] = '[Danh gia lien quan]';
             $lines[] = $relatedReviews;
         }
 
@@ -204,10 +241,14 @@ class ChatbotGroundingService
             $q->where('price_sale', '<=', (int)$maxPrice);
         }
 
-        if (trim($userMessage) !== '') {
-            $q->where(function ($qr) use ($userMessage) {
-                $qr->where('name', 'LIKE', "%{$userMessage}%")
-                    ->orWhere('description', 'LIKE', "%{$userMessage}%");
+        $terms = $this->buildSearchTerms($userMessage, []);
+        if (!empty($terms)) {
+            $q->where(function ($qr) use ($terms) {
+                foreach ($terms as $term) {
+                    $like = $this->likeTerm($term);
+                    $qr->orWhere('name', 'LIKE', $like)
+                        ->orWhere('description', 'LIKE', $like);
+                }
             });
         }
 
@@ -222,6 +263,40 @@ class ChatbotGroundingService
                 'thumbnail' => $p->thumbnail_url ?? null,
             ];
         })->toArray();
+    }
+
+    private function buildSearchTerms(string $userMessage, array $keywords, int $max = 6): array
+    {
+        $terms = [];
+        foreach ($keywords as $kw) {
+            $kw = trim((string) $kw);
+            if ($kw !== '') {
+                $terms[] = $kw;
+            }
+        }
+
+        $msg = trim($userMessage);
+        if ($msg !== '') {
+            $terms[] = $msg;
+        }
+
+        $terms = array_values(array_unique($terms));
+        if (count($terms) > $max) {
+            $terms = array_slice($terms, 0, $max);
+        }
+
+        return $terms;
+    }
+
+    private function likeTerm(string $term): string
+    {
+        $term = trim($term);
+        if ($term === '') {
+            return '%';
+        }
+
+        $escaped = addcslashes($term, '%_');
+        return '%' . $escaped . '%';
     }
 
     private function normalizeNumber(string $s): float

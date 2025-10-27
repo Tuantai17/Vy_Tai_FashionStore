@@ -18,15 +18,14 @@ class ChatbotGeminiController extends Controller
     private function systemPrompt(): string
     {
         return <<<SYS
-Bạn là Trợ lý bán hàng của FashionStore.
-Mục tiêu: tư vấn sản phẩm thời trang (áo/quần/đầm/phụ kiện), gợi ý size, phối đồ, thông tin vận chuyển/đổi trả, hỗ trợ theo ngân sách.
-Quy tắc:
-- Trả lời bằng tiếng Việt tự nhiên, gọn, có tiêu đề/bullet khi cần.
-- Nếu người dùng nêu ngân sách, ưu tiên gợi ý trong khoảng đó.
-- Khi không chắc dữ liệu, hãy nói "mình chưa chắc" và đề xuất cách hỏi thêm.
-- Ưu tiên dùng DỮ LIỆU CUNG CẤP (chính sách/FAQ/sản phẩm) thay vì suy đoán.
-- Có thể dùng cú pháp markdown trong nội dung, nhưng responseMimeType là text/plain.
-- Nếu câu hỏi ngoài phạm vi shop, hãy trả lời ngắn gọn và lịch sự từ chối.
+Ban la "Tro ly FashionStore" - tu van vien thoi trang cua cua hang. Nhiem vu: goi y trang phuc, phu kien, size, chat lieu va chinh sach giao/doi tra dua tren du lieu noi bo.
+Nguyen tac:
+1. Tra loi bang tieng Viet co dau, cau van ngan gon nhung giau thong tin; uu tien bullet khi liet ke.
+2. Khi co du lieu san pham/bai viet/danh gia duoc cung cap, trich dan nhung diem lien quan nhat (ten, gia VND, dac diem).
+3. Neu khach dua ngan sach, giai thich vi sao goi y phu hop khoang gia do va de xuat them lua chon lech nhe neu can.
+4. Luon dat cau hoi tiep theo neu thong tin chua ro (su kien, phong cach, mau sac, size, dia diem nhan hang...).
+5. Neu cau hoi ngoai pham vi thoi trang cua hang, xin loi nhe nhang va huong khach tro lai chu de phu hop.
+Thong tin co ban: Cua hang ten FashionStore, chuyen do thoi trang nu + phu kien, ho tro doi size trong 7 ngay va giao tieu chuan 2-4 ngay lam viec.
 SYS;
     }
 
@@ -35,44 +34,72 @@ SYS;
      * - Nhét grounding + tín hiệu intent vào 1 message đầu.
      * - Chỉ gửi phát ngôn user cuối (tránh 400 do role/model).
      */
-    private function buildContents(array $messages, string $grounding, array $signals): array
+    private function buildContents(array $messages, string $grounding, array $signals, int $historyTurns = 6): array
     {
         $intentInfo = [];
-        if (!empty($signals['budget'])) {
-            $intentInfo[] = 'Ngân sách ước tính: ' . number_format($signals['budget'], 0, ',', '.') . 'đ';
-        }
-        if (!empty($signals['keywords'])) {
-            $intentInfo[] = 'Từ khóa: ' . implode(', ', $signals['keywords']);
-        }
-        $intentLine = $intentInfo ? ("\n\n[Nhận dạng ý định]\n• " . implode("\n• ", $intentInfo)) : '';
+        $min = $signals['budget_min'] ?? null;
+        $max = $signals['budget_max'] ?? null;
+        $exact = $signals['budget'] ?? null;
 
-        $lastUser = $this->lastUserUtterance($messages);
+        if ($min && $max) {
+            $intentInfo[] = 'Khoang ngan sach: ' . number_format($min, 0, ',', '.') . ' - ' . number_format($max, 0, ',', '.') . ' VND';
+        } elseif ($min) {
+            $intentInfo[] = 'Ngan sach tu: ' . number_format($min, 0, ',', '.') . ' VND';
+        } elseif ($max) {
+            $intentInfo[] = 'Ngan sach den: ' . number_format($max, 0, ',', '.') . ' VND';
+        } elseif ($exact) {
+            $intentInfo[] = 'Ngan sach uoc tinh: ' . number_format($exact, 0, ',', '.') . ' VND';
+        }
+
+        if (!empty($signals['keywords'])) {
+            $intentInfo[] = 'Tu khoa: ' . implode(', ', $signals['keywords']);
+        }
+
+        $intentLine = $intentInfo ? ("\n\n[Intent signals]\n- " . implode("\n- ", $intentInfo)) : '';
 
         $contents = [];
-
-        // Nếu có grounding thì nhét làm nguồn sự thật; nếu không, bỏ qua (tránh trả về chỉ header)
         if (trim($grounding) !== '') {
             $contents[] = [
+                'role'  => 'user',
                 'parts' => [[
-                    'text' =>
-                    "Hãy dùng dữ liệu dưới đây làm nguồn sự thật chính. Nếu dữ liệu thiếu, hãy nói 'mình chưa chắc' và đề nghị thông tin bổ sung.\n\n"
+                    'text' => "Su dung du lieu noi bo duoi day lam nguon tham chieu chinh. Neu chua du thong tin thi yeu cau khach mo ta ro hon.\n\n"
                         . $grounding
-                        . $intentLine
-                ]]
+                        . $intentLine,
+                ]],
             ];
         } else {
-            // Khi không có grounding, nhắc model ưu tiên trung thực và dùng kiến thức chung
-            $hint = "(Không tìm thấy dữ liệu nội bộ liên quan.) Hãy trả lời chính xác, ngắn gọn và nếu không chắc hãy hỏi thêm thông tin.";
+            $hint = 'Khong tim thay du lieu noi bo trung khop. Hay tra loi chinh xac, ngan gon va xin them thong tin neu can.';
             $contents[] = [
-                'parts' => [['text' => $hint . ($intentLine ? "\n\n" . $intentLine : "")]]
+                'role'  => 'user',
+                'parts' => [[
+                    'text' => $hint . ($intentLine ? "\n\n" . $intentLine : ''),
+                ]],
             ];
         }
 
-        // luôn gửi only last user utterance để tránh lỗi role
-        $contents[] = ['parts' => [['text' => $lastUser]]];
+        $recent = array_slice($messages, -$historyTurns);
+        foreach ($recent as $msg) {
+            $textMsg = trim((string) ($msg['content'] ?? ''));
+            if ($textMsg === '') {
+                continue;
+            }
+            $role = (($msg['role'] ?? 'user') === 'assistant') ? 'model' : 'user';
+            $contents[] = [
+                'role'  => $role,
+                'parts' => [['text' => $textMsg]],
+            ];
+        }
+
+        if (count($contents) === 0) {
+            $contents[] = [
+                'role'  => 'user',
+                'parts' => [['text' => $this->lastUserUtterance($messages)]],
+            ];
+        }
 
         return $contents;
     }
+
 
     /* ===================== NON-STREAM ===================== */
     public function chat(Request $req)
@@ -94,7 +121,7 @@ SYS;
         $signals  = $this->grounding->extractIntent($lastUser);
         $cacheKey = 'grounding:' . md5($lastUser);
         $context  = cache()->remember($cacheKey, now()->addMinutes(10), function () use ($lastUser, $signals) {
-            return $this->grounding->buildContext($lastUser, $signals['budget'] ?? null);
+            return $this->grounding->buildContext($lastUser, $signals['budget'] ?? null, $signals);
         });
 
         // Tìm sản phẩm phù hợp theo tín hiệu ngân sách/keywords (dùng cả để trả về cho FE)
@@ -232,7 +259,7 @@ SYS;
         $signals  = $this->grounding->extractIntent($lastUser);
         $cacheKey = 'grounding:' . md5($lastUser);
         $context  = cache()->remember($cacheKey, now()->addMinutes(10), function () use ($lastUser, $signals) {
-            return $this->grounding->buildContext($lastUser, $signals['budget'] ?? null);
+            return $this->grounding->buildContext($lastUser, $signals['budget'] ?? null, $signals);
         });
 
         // Search products for this query (min/max budget from signals)
@@ -275,13 +302,21 @@ SYS;
                 CURLOPT_WRITEFUNCTION  => function ($ch, $data) {
                     foreach (preg_split("/\r\n|\n|\r/", $data) as $line) {
                         $line = trim($line);
-                        if ($line === '') continue;
+                        if ($line === '') {
+                            continue;
+                        }
                         $decoded = json_decode($line, true);
-                        if (json_last_error() !== JSON_ERROR_NONE) continue;
+                        if (json_last_error() !== JSON_ERROR_NONE) {
+                            continue;
+                        }
 
                         $text = $decoded['candidates'][0]['content']['parts'][0]['text'] ?? '';
                         if ($text !== '') {
-                            echo "data: " . str_replace(["\r", "\n"], ["\\r", "\\n"], $text) . "\n\n";
+                            $payload = json_encode(['type' => 'delta', 'text' => $text], JSON_UNESCAPED_UNICODE);
+                            if ($payload === false) {
+                                continue;
+                            }
+                            echo "data: {$payload}\n\n";
                             @ob_flush();
                             @flush();
                         }
@@ -300,12 +335,27 @@ SYS;
                 if ($fallbackEnabled) {
                     $sim = $this->localFallbackReply($contextLocal, $signalsLocal, $productsLocal);
                     $sim = $this->sanitizeReply($sim);
-                    echo "data: " . str_replace(["\r", "\n"], ['\\r', '\\n'], $sim) . "\n\n";
+                    $payload = json_encode(['type' => 'delta', 'text' => $sim], JSON_UNESCAPED_UNICODE);
+                    if ($payload !== false) {
+                        echo "data: {$payload}\n\n";
+                    }
                 } else {
-                    echo "data: (stream error)\n\n";
+                    $payload = json_encode(['type' => 'error', 'text' => 'stream error'], JSON_UNESCAPED_UNICODE);
+                    if ($payload !== false) {
+                        echo "data: {$payload}\n\n";
+                    }
                 }
             }
             curl_close($ch);
+
+            $meta = json_encode([
+                'type'     => 'meta',
+                'signals'  => $signalsLocal,
+                'products' => $productsLocal,
+            ], JSON_UNESCAPED_UNICODE);
+            if ($meta !== false) {
+                echo "data: {$meta}\n\n";
+            }
 
             echo "data: [DONE]\n\n";
             @ob_flush();

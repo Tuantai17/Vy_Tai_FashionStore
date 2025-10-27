@@ -39,7 +39,10 @@ class ProductsImport implements ToModel, WithHeadingRow
         try {
             // 0) Bỏ dòng trống
             $name = trim((string)($row['name'] ?? ''));
-            if ($name === '') { $this->skipped++; return null; }
+            if ($name === '') {
+                $this->skipped++;
+                return null;
+            }
 
             // Helper: chuẩn hoá số tiền "2.750.000" -> 2750000
             $num = function ($v) {
@@ -96,14 +99,20 @@ class ProductsImport implements ToModel, WithHeadingRow
             $existing = Product::where('slug', $slug)->first();
 
             if ($existing) {
-                if ($this->mode === 'create-only') { $this->skipped++; return null; }
+                if ($this->mode === 'create-only') {
+                    $this->skipped++;
+                    return null;
+                }
                 $existing->fill($payload);
                 $existing->updated_by = Auth::id() ?? $existing->updated_by;
                 $existing->save();
                 $this->updated++;
                 return null;
             } else {
-                if ($this->mode === 'update-only') { $this->skipped++; return null; }
+                if ($this->mode === 'update-only') {
+                    $this->skipped++;
+                    return null;
+                }
                 $p = new Product($payload);
                 $p->created_by = Auth::id() ?? $p->created_by;
                 $p->updated_by = Auth::id() ?? $p->updated_by;
